@@ -10,6 +10,8 @@ The core loop is **내가 찍고 → 내가 말하고 → AI가 편집한다**.
 
 AUG_DAILO is a React + TypeScript progressive web app. The same deployed URL runs in iPhone Safari, Galaxy Chrome, and desktop browsers. The manifest and service worker make the editor installable and cache the application shell.
 
+The production build also emits a minimal OpenAI Sites Worker entrypoint. It delegates requests to the platform asset binding, so the same client build can run on OpenAI Sites and GitHub Pages.
+
 ## Modules
 
 - `screens/`: Home, Create, Editor, Archive, and Profile surfaces.
