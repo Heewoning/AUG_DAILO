@@ -1,0 +1,35 @@
+:root {
+  font-family: Inter, Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  color: #33251e;
+  background: #f7f0df;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --cream: #f7f0df;
+  --paper: #fffaf0;
+  --butter: #f4cf63;
+  --butter-light: #ffe89a;
+  --brown: #3d2a21;
+  --espresso: #4a3024;
+  --blue: #174d9b;
+  --blue-light: #2e68bb;
+  --red: #bb4437;
+  --ink: #2a201b;
+  --muted: #75665c;
+  --line: #6d5c50;
+  --soft-line: #d8cdb7;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--cream); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 8% 20%, rgba(244, 207, 99, .16), transparent 22%), var(--cream); }
+button, input, textarea, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, video:focus-visible { outline: 3px solid #e19b27; outline-offset: 2px; }
+button { touch-action: manipulation; }
+img, video { display: block; max-width: 100%; }
+h1, h2, p { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
