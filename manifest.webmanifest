@@ -1,0 +1,12 @@
+{
+  "name": "DAILO — AI Vlog Studio",
+  "short_name": "DAILO",
+  "description": "내가 찍고, 내가 말하고, AI가 편집하는 Retro OS 브이로그 앱",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f7f0df",
+  "theme_color": "#f4cf63",
+  "orientation": "any",
+  "icons": [{"src":"favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
