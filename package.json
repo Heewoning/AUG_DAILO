@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "test": "vitest run src",
     "test:e2e": "playwright test",
-    "deploy:pages": "npm run build -- --base=/AUG_DAILO/ && gh-pages -d dist",
+    "test:mobile-deployed": "node scripts/mobile-deployed-smoke.mjs",
+    "deploy:pages": "node scripts/build-pages.mjs && gh-pages -d dist",
     "preview": "vite preview"
   },
   "dependencies": {
