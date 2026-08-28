@@ -22,15 +22,15 @@ for (const [browserName, browserType, device] of browsers) {
     page.on('requestfailed', (request) => errors.push(`requestfailed: ${request.url()} ${request.failure()?.errorText ?? ''}`))
     try {
       const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 })
-      await page.getByRole('button', { name: /CREATE VLOG/ }).waitFor({ state: 'visible', timeout: 10_000 })
-      await page.getByRole('button', { name: /CREATE VLOG/ }).click()
-      await page.getByText('CHOOSE_YOUR_DAY.EXE').waitFor({ state: 'visible', timeout: 10_000 })
+      await page.getByRole('button', { name: /영상 고르기/ }).waitFor({ state: 'visible', timeout: 10_000 })
+      await page.getByRole('button', { name: /영상 고르기/ }).click()
+      await page.getByText('오늘의 테마.EXE').waitFor({ state: 'visible', timeout: 10_000 })
       const result = {
         browser: browserName,
         site: siteName,
         status: response?.status(),
         title: await page.title(),
-        createScreen: await page.getByText('CHOOSE_YOUR_DAY.EXE').isVisible(),
+        createScreen: await page.getByText('오늘의 테마.EXE').isVisible(),
         errors,
       }
       console.log(JSON.stringify(result))

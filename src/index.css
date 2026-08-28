@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
   color: #33251e;
   background: #f7f0df;
   font-synthesis: none;
@@ -18,12 +18,13 @@
   --muted: #75665c;
   --line: #6d5c50;
   --soft-line: #d8cdb7;
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --mono: Tahoma, "Malgun Gothic", Pretendard, system-ui, sans-serif;
+  --display: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--cream); }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 8% 20%, rgba(244, 207, 99, .16), transparent 22%), var(--cream); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 8% 20%, rgba(244, 207, 99, .16), transparent 22%), var(--cream); font-size: 15px; line-height: 1.5; }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, video:focus-visible { outline: 3px solid #e19b27; outline-offset: 2px; }

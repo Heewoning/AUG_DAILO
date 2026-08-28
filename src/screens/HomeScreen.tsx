@@ -26,24 +26,22 @@ export const HomeScreen = ({ projects, onCreate, onOpenProject }: HomeProps) => 
 
       <section className="hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow">RETRO DAY IN LIFE · AI VLOG APP</p>
-          <h1>RUN<br />YOUR <em>DAY.</em></h1>
-          <p className="hero-kicker">내가 찍고, 내가 말하고,<br /><strong>AI가 편집하는 나의 하루.</strong></p>
-          <RetroButton className="primary-cta" onClick={onCreate}>CREATE VLOG <span>→</span></RetroButton>
-          <small>NO EDITING SKILLS NEEDED · AUTO SAVE ON</small>
+          <p className="eyebrow">DAY IN LIFE.EXE</p>
+          <h1>오늘 하루를<br /><em>영상으로 남겨요.</em></h1>
+          <p className="hero-kicker">내가 찍고, 내가 말하면<br /><strong>DAILO가 보기 좋게 정리해요.</strong></p>
+          <RetroButton className="primary-cta" onClick={onCreate}>영상 고르기 <span>→</span></RetroButton>
+          <small>영상 선택 → 한 줄 설명 → 저장</small>
         </div>
 
         <div className="hero-stage">
-          <div className="orbit-label orbit-label--one">OFFICE.EXE</div>
-          <div className="orbit-label orbit-label--two">SIDEJOB.EXE</div>
-          <RetroWindow title="DAY_IN_LIFE.EXE" className="hero-window">
+          <RetroWindow title="내 하루 시작하기.EXE" className="hero-window">
             <EmptyMedia />
-            <p className="ready-label">SYSTEM STATUS: <b>READY</b></p>
-            <RetroButton onClick={onCreate}>START MY DAY</RetroButton>
+            <p className="ready-label">SYSTEM STATUS: <b>준비 완료</b></p>
+            <RetroButton onClick={onCreate}>오늘 기록 시작</RetroButton>
           </RetroWindow>
           <div className="hero-popup">
-            <StatusDialog title="SYSTEM MESSAGE" message="Would you like to run your day?">
-              <RetroButton onClick={onCreate}>YES</RetroButton><RetroButton>CANCEL</RetroButton>
+            <StatusDialog title="SYSTEM MESSAGE" message="오늘의 영상을 만들어볼까요?">
+              <RetroButton onClick={onCreate}>시작</RetroButton><RetroButton>다음에</RetroButton>
             </StatusDialog>
           </div>
         </div>
@@ -66,9 +64,9 @@ export const HomeScreen = ({ projects, onCreate, onOpenProject }: HomeProps) => 
         <article className="section-card process-card">
           <div className="section-heading"><div><span>02</span><h2>HOW IT WORKS</h2></div></div>
           <ol className="process-list">
-            <li><i>1</i><span><b>SHOOT</b><small>오늘의 짧은 순간을 찍어요</small></span></li>
-            <li><i>2</i><span><b>SPEAK</b><small>내 목소리로 이야기를 남겨요</small></span></li>
-            <li><i>3</i><span><b>AI EDIT</b><small>자막과 흐름을 자동으로 맞춰요</small></span></li>
+            <li><i>1</i><span><b>영상 고르기</b><small>오늘 찍은 순간을 골라요</small></span></li>
+            <li><i>2</i><span><b>내 목소리</b><small>장면 이야기를 직접 말해요</small></span></li>
+            <li><i>3</i><span><b>자동 정리</b><small>자막과 흐름을 자연스럽게 맞춰요</small></span></li>
           </ol>
         </article>
 

@@ -3,6 +3,7 @@ import type { DailoClip, DailoProject, ProjectSummary, VoiceTrack } from '../typ
 const PROJECT_KEY = 'dailo:projects:v1'
 const DATABASE = 'dailo-media-v1'
 const STORE = 'blobs'
+const persistedVoiceVersions = new Map<string, string>()
 
 type StoredVoice = Omit<VoiceTrack, 'blob' | 'url'> & { hasBlob: boolean }
 type StoredClip = Omit<DailoClip, 'mediaUrl' | 'videoBlob' | 'voice'> & {
@@ -21,11 +22,18 @@ const openDatabase = () =>
     request.onerror = () => reject(request.error)
   })
 
-const putBlob = async (key: string, blob: Blob) => {
+const putBlob = async (key: string, blob: Blob, overwrite = false) => {
   const database = await openDatabase()
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readwrite')
-    transaction.objectStore(STORE).put(blob, key)
+    const store = transaction.objectStore(STORE)
+    if (overwrite) store.put(blob, key)
+    else {
+      const request = store.getKey(key)
+      request.onsuccess = () => {
+        if (request.result === undefined) store.put(blob, key)
+      }
+    }
     transaction.oncomplete = () => resolve()
     transaction.onerror = () => reject(transaction.error)
   })
@@ -78,7 +86,12 @@ export const saveProject = async (project: DailoProject) => {
   await Promise.all(project.clips.flatMap((clip) => {
     const writes: Promise<void>[] = []
     if (clip.videoBlob) writes.push(putBlob(`${project.id}:${clip.id}:video`, clip.videoBlob))
-    if (clip.voice?.blob) writes.push(putBlob(`${project.id}:${clip.id}:voice`, clip.voice.blob))
+    const voiceKey = `${project.id}:${clip.id}:voice`
+    if (clip.voice?.blob && persistedVoiceVersions.get(voiceKey) !== clip.voice.createdAt) {
+      writes.push(putBlob(voiceKey, clip.voice.blob, true).then(() => {
+        persistedVoiceVersions.set(voiceKey, clip.voice!.createdAt)
+      }))
+    }
     return writes
   }))
 }

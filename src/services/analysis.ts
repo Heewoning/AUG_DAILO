@@ -65,7 +65,7 @@ export class BrowserMetadataAnalysisProvider implements ClipAnalysisProvider {
         trimEnd: Math.max(Math.min(clip.duration - 0.25, clip.duration), 0),
         analysis,
       })
-      await new Promise((resolve) => setTimeout(resolve, 140))
+      await new Promise((resolve) => setTimeout(resolve, 25))
     }
     return { ...project, clips, status: 'READY' as const, updatedAt: new Date().toISOString() }
   }

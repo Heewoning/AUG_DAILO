@@ -17,8 +17,24 @@ const download = (blob: Blob, fileName: string) => {
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = fileName
+  anchor.style.display = 'none'
+  document.body.append(anchor)
   anchor.click()
+  anchor.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 2_000)
+}
+
+interface ExportedVideo {
+  blob: Blob
+  fileName: string
+}
+
+const prepareClips = async (files: File[]) => {
+  const clips: DailoClip[] = []
+  for (let index = 0; index < files.length; index += 2) {
+    clips.push(...await Promise.all(files.slice(index, index + 2).map(fileToClip)))
+  }
+  return clips
 }
 
 function App() {
@@ -31,13 +47,14 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [exportState, setExportState] = useState<ExportProgress>()
   const [exportError, setExportError] = useState<string>()
+  const [exportedVideo, setExportedVideo] = useState<ExportedVideo>()
   const [toast, setToast] = useState<string>()
   const [startup, setStartup] = useState(() => sessionStorage.getItem('dailo:booted') !== 'yes')
 
   useEffect(() => {
     if (!startup) return
     sessionStorage.setItem('dailo:booted', 'yes')
-    const timer = window.setTimeout(() => setStartup(false), 1250)
+    const timer = window.setTimeout(() => setStartup(false), 550)
     return () => window.clearTimeout(timer)
   }, [startup])
 
@@ -86,8 +103,7 @@ function App() {
   const onFiles = useCallback(async (files: File[]) => {
     setLoadingFiles(true)
     try {
-      const clips: DailoClip[] = []
-      for (const file of files) clips.push(await fileToClip(file))
+      const clips = await prepareClips(files)
       setProject((current) => ({ ...current, clips: [...current.clips, ...clips], updatedAt: new Date().toISOString() }))
       setSelectedClipId((current) => current ?? clips[0]?.id)
       setToast(`${clips.length}개의 영상 썸네일을 만들었어요.`)
@@ -126,9 +142,12 @@ function App() {
       const organized = await analysisProvider.organizeProject(project, setAnalysisProgress)
       setProject(organized)
       setSelectedClipId(organized.clips[0]?.id)
-      await saveProject(organized)
-      setProjects(listProjects())
       setView('editor')
+      saveProject(organized)
+        .then(() => setProjects(listProjects()))
+        .catch(() => setToast('편집 화면은 준비됐어요. 저장 공간을 확인해 주세요.'))
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : '클립 정리 중 문제가 생겼어요. 다시 시도해 주세요.')
     } finally {
       setAnalysisProgress(undefined)
     }
@@ -144,21 +163,40 @@ function App() {
 
   const exportVideo = useCallback(async () => {
     setExportError(undefined)
+    setExportedVideo(undefined)
     setExportState({ percent: 1, task: '렌더링 엔진 확인 중' })
     try {
       if (!canRenderVideo()) throw new Error('이 브라우저는 합성 영상 내보내기를 지원하지 않아요. 최신 Safari 또는 Chrome에서 다시 시도해 주세요.')
       const result = await renderProject(project, setExportState)
       const fileDate = new Date().toLocaleDateString('en-CA').replaceAll('-', '')
-      download(result.blob, `DAY_IN_LIFE_${fileDate}.${result.extension}`)
+      setExportedVideo({ blob: result.blob, fileName: `DAY_IN_LIFE_${fileDate}.${result.extension}` })
       const exported = { ...project, status: 'EXPORTED' as const, updatedAt: new Date().toISOString() }
       setProject(exported)
-      await saveProject(exported)
-      setProjects(listProjects())
+      saveProject(exported)
+        .then(() => setProjects(listProjects()))
+        .catch(() => setToast('영상은 완성됐어요. 프로젝트 자동 저장만 확인해 주세요.'))
     } catch (error) {
       setExportState(undefined)
       setExportError(error instanceof Error ? error.message : '영상 내보내기에 실패했습니다. 원본 클립은 안전합니다.')
     }
   }, [project])
+
+  const saveExportedVideo = useCallback(async () => {
+    if (!exportedVideo) return
+    const file = new File([exportedVideo.blob], exportedVideo.fileName, { type: exportedVideo.blob.type })
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'DAILO — 오늘의 영상' })
+      } else {
+        download(exportedVideo.blob, exportedVideo.fileName)
+      }
+      setToast('영상 저장을 시작했어요.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      download(exportedVideo.blob, exportedVideo.fileName)
+      setToast('다운로드 폴더에 영상을 저장했어요.')
+    }
+  }, [exportedVideo])
 
   const changeView = (next: AppView) => {
     if (next === 'create') startNew()
@@ -201,7 +239,9 @@ function App() {
           onExport={exportVideo}
           exportState={exportState}
           exportError={exportError}
-          onCloseExport={() => { setExportState(undefined); setExportError(undefined) }}
+          exportReady={Boolean(exportedVideo)}
+          onSaveExport={saveExportedVideo}
+          onCloseExport={() => { setExportState(undefined); setExportError(undefined); setExportedVideo(undefined) }}
         />
       )}
       {view === 'archive' && <ArchiveScreen projects={projects} onOpen={(id) => void openProject(id)} onCreate={startNew} />}

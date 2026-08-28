@@ -21,6 +21,7 @@ export const CreateScreen = ({
   const inputRef = useRef<HTMLInputElement>(null)
   const [selectedId, setSelectedId] = useState<string>()
   const [dragging, setDragging] = useState(false)
+  const [showAllModes, setShowAllModes] = useState(false)
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedId) ?? project.clips[0],
     [project.clips, selectedId],
@@ -36,14 +37,14 @@ export const CreateScreen = ({
   return (
     <main className="screen create-screen">
       <header className="page-heading">
-        <div><p className="eyebrow">NEW PROJECT · STEP 01</p><h1>오늘 하루를<br /><em>어떻게 기록할까요?</em></h1></div>
-        <p>먼저 하루의 모드를 고르고 영상 클립을 불러오세요.<br />촬영 시간순 정렬과 기본 정보는 자동으로 준비됩니다.</p>
+        <div><p className="eyebrow">새 영상 · 1단계</p><h1>오늘의 영상을<br /><em>골라 주세요.</em></h1></div>
+        <p>하루의 분위기를 고른 뒤 영상을 불러오세요.<br />썸네일로 확인하고 바로 편집할 수 있어요.</p>
       </header>
 
       <section className="create-layout">
-        <RetroWindow title="CHOOSE_YOUR_DAY.EXE" className="mode-window">
+        <RetroWindow title="오늘의 테마.EXE" className="mode-window">
           <div className="mode-list">
-            {projectModes.map((item) => (
+            {projectModes.slice(0, showAllModes ? projectModes.length : 4).map((item) => (
               <button
                 key={item.mode}
                 className={project.mode === item.mode ? 'active' : ''}
@@ -52,11 +53,14 @@ export const CreateScreen = ({
                 <i>{item.glyph}</i><span><b>{item.label}</b><small>{item.note}</small></span><em>›</em>
               </button>
             ))}
+            <button className="more-modes" onClick={() => setShowAllModes((value) => !value)}>
+              <i>+</i><span><b>{showAllModes ? '간단히 보기' : '다른 테마 보기'}</b><small>{showAllModes ? '자주 쓰는 테마만 표시' : '여행, 운동, 공부 등'}</small></span><em>›</em>
+            </button>
           </div>
         </RetroWindow>
 
         <div className="upload-column">
-          <RetroWindow title="ADD_YOUR_CLIPS.MOV" className="upload-window" tone="brown">
+          <RetroWindow title="내 영상 불러오기.MOV" className="upload-window" tone="brown">
             <div
               className={`drop-zone ${dragging ? 'dragging' : ''}`}
               onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
@@ -71,7 +75,7 @@ export const CreateScreen = ({
                 onChange={(event) => void acceptFiles(event.target.files)}
               />
               <span className="upload-glyph" aria-hidden="true">↑</span>
-              <h2>{loadingFiles ? 'THUMBNAIL.EXE RUNNING...' : 'DROP YOUR MOMENTS HERE'}</h2>
+              <h2>{loadingFiles ? '썸네일을 만드는 중...' : '오늘 찍은 영상을 골라 주세요'}</h2>
               <p>영상 여러 개를 한 번에 선택할 수 있어요.<br />각 영상은 바로 썸네일과 재생 미리보기를 만듭니다.</p>
               <RetroButton onClick={() => inputRef.current?.click()} disabled={loadingFiles}>
                 {loadingFiles ? '불러오는 중...' : '영상 선택하기'}
@@ -83,8 +87,8 @@ export const CreateScreen = ({
           {project.clips.length > 0 && (
             <section className="clip-review">
               <div className="section-heading">
-                <div><span>{String(project.clips.length).padStart(2, '0')}</span><h2>CLIPS LOADED</h2></div>
-                <button onClick={() => inputRef.current?.click()}>+ ADD MORE</button>
+                <div><span>{String(project.clips.length).padStart(2, '0')}</span><h2>선택한 영상</h2></div>
+                <button onClick={() => inputRef.current?.click()}>+ 영상 추가</button>
               </div>
               <div className="clip-review__content">
                 <div className="upload-preview">
@@ -114,7 +118,7 @@ export const CreateScreen = ({
               </div>
               <div className="create-footer">
                 <p><i>✓</i><span><b>클립 준비 완료</b><small>AI는 목소리를 만들지 않아요. 내 영상과 내 목소리만 사용합니다.</small></span></p>
-                <RetroButton className="primary-cta" onClick={() => void onAnalyze()}>AI EDIT 시작 <span>→</span></RetroButton>
+                <RetroButton className="primary-cta" onClick={() => void onAnalyze()}>자동으로 정리하고 편집하기 <span>→</span></RetroButton>
               </div>
             </section>
           )}
@@ -123,9 +127,9 @@ export const CreateScreen = ({
 
       {analysisProgress && (
         <div className="modal-backdrop" role="status" aria-live="polite">
-          <RetroWindow title="AI_EDIT.EXE" className="render-dialog">
+          <RetroWindow title="영상 정리 중.EXE" className="render-dialog">
             <span className="render-symbol">✦</span>
-            <h2>YOUR DAY IS BEING ORGANIZED.</h2>
+            <h2>영상 편집 화면을 준비하고 있어요.</h2>
             <p>촬영 시간과 장면 흐름을 정리하고 있어요.</p>
             <ProgressBar value={(analysisProgress.current / analysisProgress.total) * 100} />
             <small>{analysisProgress.task}</small>

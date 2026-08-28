@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 test('home to upload thumbnails to editor flow works', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone-webkit', 'WebKit 테스트 런타임은 canvas.captureStream 테스트 픽스처 생성을 지원하지 않음')
   await page.goto('./')
-  await expect(page.getByRole('button', { name: /CREATE VLOG/ })).toBeVisible()
-  await page.getByRole('button', { name: /CREATE VLOG/ }).click()
-  await expect(page.getByText('CHOOSE_YOUR_DAY.EXE')).toBeVisible()
-  await page.getByRole('button', { name: /N-Job Day/ }).click()
+  await expect(page.getByRole('button', { name: /영상 고르기/ })).toBeVisible()
+  await page.getByRole('button', { name: /영상 고르기/ }).click()
+  await expect(page.getByText('오늘의 테마.EXE')).toBeVisible()
+  await page.getByRole('button', { name: /N잡 데이/ }).click()
 
   const videoBytes = await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
@@ -41,15 +42,24 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   })
   await expect(page.getByAltText('morning-coffee.webm 대표 장면')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByLabel('morning-coffee.webm 미리보기')).toBeVisible()
-  await page.getByRole('button', { name: /AI EDIT 시작/ }).click()
+  await page.getByRole('button', { name: /자동으로 정리하고 편집하기/ }).click()
   await expect(page.getByText('MY_DAY_IS_RUNNING.EXE')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('USER VOICE ONLY')).toHaveCount(0)
+  await expect(page.getByLabel('1번 클립 시간')).toBeVisible()
+  await expect(page.getByLabel('1번 클립 문구')).toBeVisible()
+
+  await page.getByRole('button', { name: /영상 만들기/ }).click()
+  await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 30_000 })
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: '영상 저장하기' }).click()
+  const result = await downloadPromise
+  expect(result.suggestedFilename()).toMatch(/^DAY_IN_LIFE_\d{8}\.(webm|mp4)$/)
 })
 
 test('mobile home keeps the primary action and navigation reachable', async ({ page }) => {
   await page.goto('./')
-  await expect(page.getByRole('button', { name: /CREATE VLOG/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /영상 고르기/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '주요 메뉴' })).toBeVisible()
-  await page.getByRole('button', { name: /CREATE VLOG/ }).click()
+  await page.getByRole('button', { name: /영상 고르기/ }).click()
   await expect(page.getByRole('button', { name: /영상 선택하기/ })).toBeVisible()
 })

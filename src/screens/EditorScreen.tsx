@@ -15,14 +15,20 @@ interface EditorProps {
   onExport: () => Promise<void>
   exportState?: { percent: number; task: string }
   exportError?: string
+  exportReady: boolean
+  onSaveExport: () => Promise<void>
   onCloseExport: () => void
 }
 
 const tabs: EditorTab[] = ['CLIP', 'TEXT', 'VOICE', 'TRANSITION', 'POPUP']
+const tabLabels: Record<EditorTab, string> = {
+  CLIP: '기본', TEXT: '자막', VOICE: '내 목소리', TRANSITION: '전환', POPUP: '말풍선',
+}
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 
 export const EditorScreen = ({
-  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onExport, exportState, exportError, onCloseExport,
+  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onExport, exportState, exportError,
+  exportReady, onSaveExport, onCloseExport,
 }: EditorProps) => {
   const [tab, setTab] = useState<EditorTab>('CLIP')
   const [showAssistant, setShowAssistant] = useState(false)
@@ -47,21 +53,28 @@ export const EditorScreen = ({
         <div className="editor-title"><span className="mini-logo">D</span><div><b>{project.title}</b><small>{project.mode} · {project.clips.length} CLIPS</small></div></div>
         <span className={`save-state ${saving ? 'saving' : ''}`}><i />{saving ? 'SAVING...' : 'SAVED'}</span>
         <div className="editor-header__actions">
-          <button className="ai-button" onClick={() => setShowAssistant((value) => !value)}>✦ AI EDIT</button>
-          <RetroButton onClick={() => void onExport()}>EXPORT <span>↗</span></RetroButton>
+          <button className="ai-button" onClick={() => setShowAssistant((value) => !value)}>✦ 편집 도움</button>
+          <RetroButton onClick={() => void onExport()}>영상 만들기 <span>↗</span></RetroButton>
         </div>
       </header>
 
       <div className="editor-workspace">
         <aside className="clip-sidebar">
-          <header><span>CLIP LIST</span><b>{project.clips.length}</b></header>
-          <div>
+          <header><span>내 영상 클립</span><b>{project.clips.length}</b></header>
+          <div className="clip-sidebar__list">
             {project.clips.map((clip, index) => (
-              <button key={clip.id} className={clip.id === selected.id ? 'active' : ''} onClick={() => onSelect(clip.id)}>
-                <em>{String(index + 1).padStart(2, '0')}</em>
-                {clip.thumbnail ? <img src={clip.thumbnail} alt="" /> : <i>VIDEO</i>}
-                <span><b>{clip.displayTime}</b><small>{clip.activity}</small></span>
-              </button>
+              <article key={clip.id} className={`clip-sidebar-card ${clip.id === selected.id ? 'active' : ''}`}>
+                <button className="clip-sidebar-card__select" onClick={() => onSelect(clip.id)}>
+                  <em>{String(index + 1).padStart(2, '0')}</em>
+                  {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <i>VIDEO</i>}
+                  <span><b>{clip.displayTime}</b><small>{clip.name}</small></span>
+                </button>
+                <div className="clip-sidebar-card__fields">
+                  <label><span>시간</span><input aria-label={`${index + 1}번 클립 시간`} value={clip.displayTime} onChange={(event) => onUpdateClip(clip.id, { displayTime: event.target.value })} /></label>
+                  <label className="clip-copy-field"><span>장면 문구</span><input aria-label={`${index + 1}번 클립 문구`} value={clip.activity} placeholder="예: 퇴근 후 카페" onChange={(event) => onUpdateClip(clip.id, { activity: event.target.value })} /></label>
+                  <button className="clip-record-shortcut" onClick={() => { onSelect(clip.id); setTab('VOICE') }}>● 설명 녹음</button>
+                </div>
+              </article>
             ))}
           </div>
         </aside>
@@ -71,8 +84,10 @@ export const EditorScreen = ({
           <div className="phone-preview">
             <video key={selected.id} src={selected.mediaUrl} controls playsInline preload="metadata" />
             <div className="video-gradient" />
-            <div className="video-stamp"><b>{selected.displayTime}</b><span>{selected.activity}</span></div>
-            {selected.caption && <p className="video-caption">{selected.caption}</p>}
+            <div className="clip-speech-preview">
+              <header>◷ {selected.displayTime}</header>
+              <div><b>{selected.activity || '이 장면의 문구를 입력해 주세요'}</b>{(selected.caption || selected.voice?.transcript) && <p>{selected.caption || selected.voice?.transcript}</p>}</div>
+            </div>
             {selected.popup.enabled && (
               <RetroWindow title={selected.popup.title} className="video-popup">
                 <div><span className="warning-icon">!</span><b>{selected.popup.message}</b></div>
@@ -86,33 +101,36 @@ export const EditorScreen = ({
         <aside className="inspector">
           <header><span>CLIP_{String(project.clips.indexOf(selected) + 1).padStart(2, '0')}.MOV</span><button>×</button></header>
           <nav className="tool-tabs" aria-label="편집 도구">
-            {tabs.map((item) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{item}</button>)}
+            {tabs.map((item) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{tabLabels[item]}</button>)}
           </nav>
 
           {tab === 'CLIP' && (
             <div className="inspector-panel">
-              <label>TIME<input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /></label>
-              <label>ACTIVITY<input value={selected.activity} onChange={(event) => onUpdateClip(selected.id, { activity: event.target.value.toUpperCase() })} /></label>
-              <div className="field-row"><label>TRIM START<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>TRIM END<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>
-              <label>SPEED<select value={selected.speed} onChange={(event) => onUpdateClip(selected.id, { speed: Number(event.target.value) })}>{[0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
-              <label>ORIGINAL SOUND <span>{selected.volume}%</span><input type="range" min="0" max="100" value={selected.volume} onChange={(event) => onUpdateClip(selected.id, { volume: Number(event.target.value) })} /></label>
-              <label>MOOD<div className="choice-grid">{moods.map((mood) => <button key={mood} className={selected.mood === mood ? 'active' : ''} onClick={() => onUpdateClip(selected.id, { mood })}>{mood}</button>)}</div></label>
-              <label>ENERGY <span>{selected.energy}%</span><input type="range" min="0" max="100" value={selected.energy} onChange={(event) => onUpdateClip(selected.id, { energy: Number(event.target.value) })} /></label>
-              <button className="danger-action" onClick={() => onDeleteClip(selected.id)}>DELETE THIS CLIP</button>
+              <label>시간<input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /></label>
+              <label>장면 문구<input value={selected.activity} onChange={(event) => onUpdateClip(selected.id, { activity: event.target.value })} /></label>
+              <details className="advanced-tools">
+                <summary>상세 편집 열기</summary>
+                <div className="field-row"><label>시작 위치<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>끝 위치<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>
+                <label>재생 속도<select value={selected.speed} onChange={(event) => onUpdateClip(selected.id, { speed: Number(event.target.value) })}>{[0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+                <label>원본 소리 <span>{selected.volume}%</span><input type="range" min="0" max="100" value={selected.volume} onChange={(event) => onUpdateClip(selected.id, { volume: Number(event.target.value) })} /></label>
+                <label>오늘의 기분<div className="choice-grid">{moods.map((mood) => <button key={mood} className={selected.mood === mood ? 'active' : ''} onClick={() => onUpdateClip(selected.id, { mood })}>{mood}</button>)}</div></label>
+                <label>에너지 <span>{selected.energy}%</span><input type="range" min="0" max="100" value={selected.energy} onChange={(event) => onUpdateClip(selected.id, { energy: Number(event.target.value) })} /></label>
+                <button className="danger-action" onClick={() => onDeleteClip(selected.id)}>이 클립 삭제</button>
+              </details>
             </div>
           )}
 
           {tab === 'TEXT' && (
             <div className="inspector-panel">
-              <label>CAPTION<textarea rows={5} value={selected.caption} placeholder="내 목소리의 자막이 여기에 표시돼요." onChange={(event) => onUpdateClip(selected.id, { caption: event.target.value })} /></label>
+              <label>자막<textarea rows={5} value={selected.caption} placeholder="내 목소리에서 만든 자막이 여기에 표시돼요." onChange={(event) => onUpdateClip(selected.id, { caption: event.target.value })} /></label>
               <div className="info-box"><i>i</i><p><b>VOICE → CAPTION</b><br />VOICE 탭에서 녹음하면 지원 브라우저에서 음성을 인식해 자막으로 자동 입력합니다.</p></div>
-              <label>STYLE<select><option>RETRO SUBTITLE</option><option>MINIMAL</option><option>TYPEWRITER</option><option>EDITORIAL</option></select></label>
+              <label>자막 스타일<select><option>레트로 자막</option><option>심플</option><option>타자기</option><option>에디토리얼</option></select></label>
             </div>
           )}
 
           {tab === 'VOICE' && (
             <div className="inspector-panel voice-panel">
-              <div className="user-voice-only"><span>●</span><div><b>USER VOICE ONLY</b><small>AI GENERATED VOICE · OFF</small></div></div>
+              <div className="user-voice-only"><span>●</span><div><b>내 목소리만 사용해요</b><small>USER VOICE ONLY</small></div></div>
               {recorder.recording ? (
                 <div className="recording-card"><span>RECORDING...</span><b>{recorder.seconds.toFixed(1)}s</b><div className="waveform">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div><p>{recorder.transcript || '말씀해 주세요. 내 목소리를 듣고 있어요.'}</p><RetroButton onClick={recorder.stop}>■ STOP & SAVE</RetroButton></div>
               ) : (
@@ -176,11 +194,12 @@ export const EditorScreen = ({
         <div className="modal-backdrop" role="status" aria-live="polite">
           <RetroWindow title={exportError ? 'SYSTEM ERROR' : 'EXPORT_DAY.EXE'} className="render-dialog">
             <span className="render-symbol">{exportError ? '!' : '▣'}</span>
-            <h2>{exportError ? 'EXPORT FAILED' : exportState?.percent === 100 ? 'DAY COMPLETE' : 'RENDERING YOUR DAY...'}</h2>
+            <h2>{exportError ? '영상 만들기에 실패했어요' : exportReady ? '오늘의 영상이 완성됐어요' : '영상을 만들고 있어요'}</h2>
             <p>{exportError ?? exportState?.task}</p>
             {!exportError && <ProgressBar value={exportState?.percent ?? 0} />}
             {!exportError && <small>{exportState?.percent ?? 0}% · 브라우저를 닫지 마세요.</small>}
-            {(exportError || exportState?.percent === 100) && <RetroButton onClick={onCloseExport}>CLOSE</RetroButton>}
+            {exportReady && <RetroButton className="save-export-button" onClick={() => void onSaveExport()}>영상 저장하기</RetroButton>}
+            {(exportError || exportReady) && <button className="plain-close" onClick={onCloseExport}>닫기</button>}
           </RetroWindow>
         </div>
       )}
