@@ -25,16 +25,18 @@ for (const [browserName, browserType, device] of browsers) {
       await page.getByRole('button', { name: /영상 만들기 시작/ }).waitFor({ state: 'visible', timeout: 10_000 })
       await page.getByRole('button', { name: /영상 만들기 시작/ }).click()
       await page.getByText('STEP 01').waitFor({ state: 'visible', timeout: 10_000 })
+      await page.getByRole('button', { name: /N잡 데이/ }).click()
+      await page.getByText('STEP 02').waitFor({ state: 'visible', timeout: 10_000 })
       const result = {
         browser: browserName,
         site: siteName,
         status: response?.status(),
         title: await page.title(),
-        createScreen: await page.getByText('STEP 01').isVisible(),
+        themeAdvanced: await page.getByText('STEP 02').isVisible(),
         errors,
       }
       console.log(JSON.stringify(result))
-      if (result.status !== 200 || !result.createScreen || errors.length) failures.push(result)
+      if (result.status !== 200 || !result.themeAdvanced || errors.length) failures.push(result)
     } catch (error) {
       const result = { browser: browserName, site: siteName, errors: [...errors, error.message] }
       console.error(JSON.stringify(result))

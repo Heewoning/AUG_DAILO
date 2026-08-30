@@ -11,6 +11,13 @@ createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
+    void navigator.serviceWorker.getRegistrations().then((registrations) =>
+      Promise.all(registrations.map((registration) => registration.unregister())),
+    )
+    if ('caches' in window) {
+      void caches.keys().then((keys) =>
+        Promise.all(keys.filter((key) => key.startsWith('dailo-shell-')).map((key) => caches.delete(key))),
+      )
+    }
   })
 }

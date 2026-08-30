@@ -43,6 +43,11 @@ export const CreateScreen = ({
     window.setTimeout(() => document.querySelector<HTMLInputElement>('#custom-theme')?.focus(), 0)
   }
 
+  const choosePreset = (mode: ProjectMode) => {
+    onModeChange(mode)
+    setStep(2)
+  }
+
   const goToUpload = () => {
     if (project.mode === 'CUSTOM' && !project.customTheme.trim()) onProjectChange({ customTheme: '나만의 하루' })
     setStep(2)
@@ -68,7 +73,7 @@ export const CreateScreen = ({
           </header>
           <div className="simple-mode-grid">
             {projectModes.slice(0, 4).map((item) => (
-              <button key={item.mode} className={project.mode === item.mode ? 'active' : ''} onClick={() => onModeChange(item.mode)}>
+              <button key={item.mode} className={project.mode === item.mode ? 'active' : ''} onClick={() => choosePreset(item.mode)}>
                 <i>{item.glyph}</i><span><b>{item.label}</b><small>{item.note}</small></span><em>{project.mode === item.mode ? '✓' : '›'}</em>
               </button>
             ))}
@@ -83,8 +88,8 @@ export const CreateScreen = ({
             </label>
           )}
           <div className="quest-next">
-            <p><i>1</i><span>테마를 골랐어요.<br /><small>다음 화면에서 영상을 선택해요.</small></span></p>
-            <RetroButton className="primary-cta" onClick={goToUpload}>다음 <span>→</span></RetroButton>
+            <p><i>1</i><span>{project.mode === 'CUSTOM' ? '테마 이름을 확인해 주세요.' : '테마를 누르면 바로 이동해요.'}<br /><small>다음 화면에서 영상을 선택해요.</small></span></p>
+            {project.mode === 'CUSTOM' && <RetroButton className="primary-cta" onClick={goToUpload}>확인 <span>→</span></RetroButton>}
           </div>
         </section>
       ) : (

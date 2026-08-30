@@ -9,7 +9,6 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await page.getByRole('button', { name: /영상 만들기 시작/ }).click()
   await expect(page.getByText('STEP 01')).toBeVisible()
   await page.getByRole('button', { name: /N잡 데이/ }).click()
-  await page.getByRole('button', { name: /^다음/ }).click()
   await expect(page.getByText('STEP 02')).toBeVisible()
 
   const videoBytes = await page.evaluate(async () => {
@@ -76,7 +75,7 @@ test('mobile home keeps the primary action and navigation reachable', async ({ p
   await page.getByLabel('나의 테마 이름').fill('학교 끝나고 친구와')
   await expect(page.getByLabel('나의 테마 이름')).toHaveValue('학교 끝나고 친구와')
   await page.getByLabel('나의 테마 이름').fill('')
-  await expect(page.getByRole('button', { name: /^다음/ })).toBeVisible()
-  await page.getByRole('button', { name: /^다음/ }).click()
+  await expect(page.getByRole('button', { name: /^확인/ })).toBeVisible()
+  await page.getByRole('button', { name: /^확인/ }).click()
   await expect(page.getByRole('button', { name: /내 영상 고르기/ })).toBeVisible()
 })
