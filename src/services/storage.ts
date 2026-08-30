@@ -54,9 +54,64 @@ const getBlob = async (key: string) => {
   return blob
 }
 
+const normalizeStoredClip = (value: unknown, index: number): StoredClip | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const clip = value as Partial<StoredClip>
+  const capturedAt = typeof clip.capturedAt === 'string' ? clip.capturedAt : new Date().toISOString()
+  return {
+    ...clip,
+    id: typeof clip.id === 'string' ? clip.id : `legacy-clip-${index}`,
+    name: typeof clip.name === 'string' ? clip.name : `VIDEO_${index + 1}.MOV`,
+    thumbnail: typeof clip.thumbnail === 'string' ? clip.thumbnail : '',
+    duration: Number.isFinite(clip.duration) ? Number(clip.duration) : 0,
+    trimStart: Number.isFinite(clip.trimStart) ? Number(clip.trimStart) : 0,
+    trimEnd: Number.isFinite(clip.trimEnd) ? Number(clip.trimEnd) : Number(clip.duration) || 0,
+    capturedAt,
+    displayTime: typeof clip.displayTime === 'string' ? clip.displayTime : '--:--',
+    activity: typeof clip.activity === 'string' ? clip.activity : '',
+    caption: typeof clip.caption === 'string' ? clip.caption : '',
+    mood: clip.mood ?? 'BUSY',
+    energy: Number.isFinite(clip.energy) ? Number(clip.energy) : 70,
+    volume: Number.isFinite(clip.volume) ? Number(clip.volume) : 100,
+    speed: Number.isFinite(clip.speed) ? Number(clip.speed) : 1,
+    transition: clip.transition ?? 'AUTO',
+    popup: clip.popup ?? { enabled: false, kind: 'SYSTEM MESSAGE', title: 'SYSTEM MESSAGE', message: 'LIFE.EXE IS RUNNING...', button: 'OK' },
+    hasVideoBlob: Boolean(clip.hasVideoBlob),
+  } as StoredClip
+}
+
+const normalizeStoredProject = (value: unknown, index: number): StoredProject | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const project = value as Partial<StoredProject>
+  const now = new Date().toISOString()
+  return {
+    ...project,
+    id: typeof project.id === 'string' ? project.id : `legacy-project-${index}`,
+    title: typeof project.title === 'string' ? project.title : 'MY_DAY_IS_RUNNING.EXE',
+    mode: project.mode ?? 'DAY IN LIFE',
+    clips: (Array.isArray(project.clips) ? project.clips : []).flatMap((clip, clipIndex) => {
+      const normalized = normalizeStoredClip(clip, clipIndex)
+      return normalized ? [normalized] : []
+    }),
+    createdAt: typeof project.createdAt === 'string' ? project.createdAt : now,
+    updatedAt: typeof project.updatedAt === 'string' ? project.updatedAt : now,
+    status: project.status ?? 'DRAFT',
+    preset: project.preset ?? 'RETRO',
+    outputLength: project.outputLength ?? 30,
+    customTheme: typeof project.customTheme === 'string' ? project.customTheme : '',
+    coverTitle: typeof project.coverTitle === 'string' ? project.coverTitle : '오늘의 하루.EXE',
+    fastIntro: project.fastIntro ?? true,
+  } as StoredProject
+}
+
 const readAll = (): StoredProject[] => {
   try {
-    return JSON.parse(localStorage.getItem(PROJECT_KEY) ?? '[]') as StoredProject[]
+    const parsed: unknown = JSON.parse(localStorage.getItem(PROJECT_KEY) ?? '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((project, index) => {
+      const normalized = normalizeStoredProject(project, index)
+      return normalized ? [normalized] : []
+    })
   } catch {
     return []
   }
@@ -118,7 +173,7 @@ const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoCl
   const videoBlob = clip.hasVideoBlob ? await getBlob(`${projectId}:${clip.id}:video`) : undefined
   const voiceBlob = clip.voice?.hasBlob ? await getBlob(`${projectId}:${clip.id}:voice`) : undefined
   const { hasVideoBlob: _hasVideoBlob, voice, ...metadata } = clip
-  const presentation = activityTextProvider.present(metadata.activity)
+  const presentation = activityTextProvider.present(metadata.activity || '')
   return {
     ...metadata,
     activityEnglish: metadata.activityEnglish || presentation.english,

@@ -66,10 +66,6 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
-  useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [view])
-
   const startNew = useCallback(() => {
     setProject(createProject())
     setSelectedClipId(undefined)

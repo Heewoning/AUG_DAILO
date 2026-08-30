@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { projectModes } from '../data'
 import { formatDuration } from '../services/mediaMetadata'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
@@ -26,7 +26,6 @@ export const CreateScreen = ({
   const [chosenMode, setChosenMode] = useState<ProjectMode>()
   const [selectedId, setSelectedId] = useState<string>()
   const [dragging, setDragging] = useState(false)
-  useEffect(() => window.scrollTo(0, 0), [step])
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedId) ?? project.clips[0],
     [project.clips, selectedId],
@@ -52,7 +51,7 @@ export const CreateScreen = ({
 
   const goToUpload = () => {
     if (!chosenMode) return
-    if (chosenMode === 'CUSTOM' && !project.customTheme.trim()) onProjectChange({ customTheme: '나만의 하루' })
+    if (chosenMode === 'CUSTOM' && !(project.customTheme ?? '').trim()) onProjectChange({ customTheme: '나만의 하루' })
     setStep(2)
   }
 
@@ -87,7 +86,7 @@ export const CreateScreen = ({
           {chosenMode === 'CUSTOM' && (
             <label className="custom-theme-input" htmlFor="custom-theme">
               나의 테마 이름
-              <input id="custom-theme" value={project.customTheme} maxLength={24} placeholder="예: 친구와 성수동 데이" onChange={(event) => onProjectChange({ customTheme: event.target.value })} />
+              <input id="custom-theme" value={project.customTheme ?? ''} maxLength={24} placeholder="예: 친구와 성수동 데이" onChange={(event) => onProjectChange({ customTheme: event.target.value })} />
             </label>
           )}
           <div className="quest-next">

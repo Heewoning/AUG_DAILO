@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 test('theme selection opens the video page without a blank screen', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('dailo:projects:v1', JSON.stringify([{ id: 'old-project', title: 'OLD_DAY.EXE', clips: [{}] }]))
+  })
   await page.goto('./')
   await page.getByRole('button', { name: /영상 만들기 시작/ }).click()
   const nextButton = page.getByRole('button', { name: /^다음/ })
