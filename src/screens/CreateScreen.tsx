@@ -23,9 +23,10 @@ export const CreateScreen = ({
 }: CreateProps) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<1 | 2>(project.clips.length ? 2 : 1)
+  const [chosenMode, setChosenMode] = useState<ProjectMode>()
   const [selectedId, setSelectedId] = useState<string>()
   const [dragging, setDragging] = useState(false)
-  useEffect(() => window.scrollTo({ top: 0, behavior: 'auto' }), [step])
+  useEffect(() => window.scrollTo(0, 0), [step])
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedId) ?? project.clips[0],
     [project.clips, selectedId],
@@ -40,16 +41,18 @@ export const CreateScreen = ({
 
   const chooseCustom = () => {
     onModeChange('CUSTOM')
+    setChosenMode('CUSTOM')
     window.setTimeout(() => document.querySelector<HTMLInputElement>('#custom-theme')?.focus(), 0)
   }
 
   const choosePreset = (mode: ProjectMode) => {
     onModeChange(mode)
-    setStep(2)
+    setChosenMode(mode)
   }
 
   const goToUpload = () => {
-    if (project.mode === 'CUSTOM' && !project.customTheme.trim()) onProjectChange({ customTheme: '나만의 하루' })
+    if (!chosenMode) return
+    if (chosenMode === 'CUSTOM' && !project.customTheme.trim()) onProjectChange({ customTheme: '나만의 하루' })
     setStep(2)
   }
 
@@ -73,23 +76,23 @@ export const CreateScreen = ({
           </header>
           <div className="simple-mode-grid">
             {projectModes.slice(0, 4).map((item) => (
-              <button key={item.mode} className={project.mode === item.mode ? 'active' : ''} onClick={() => choosePreset(item.mode)}>
-                <i>{item.glyph}</i><span><b>{item.label}</b><small>{item.note}</small></span><em>{project.mode === item.mode ? '✓' : '›'}</em>
+              <button key={item.mode} className={chosenMode === item.mode ? 'active' : ''} onClick={() => choosePreset(item.mode)}>
+                <i>{item.glyph}</i><span><b>{item.label}</b><small>{item.note}</small></span><em>{chosenMode === item.mode ? '✓' : '›'}</em>
               </button>
             ))}
-            <button className={`custom-mode-card ${project.mode === 'CUSTOM' ? 'active' : ''}`} onClick={chooseCustom}>
-              <i>+</i><span><b>내가 직접 적기</b><small>나만의 테마를 만들어요</small></span><em>{project.mode === 'CUSTOM' ? '✓' : '›'}</em>
+            <button className={`custom-mode-card ${chosenMode === 'CUSTOM' ? 'active' : ''}`} onClick={chooseCustom}>
+              <i>+</i><span><b>내가 직접 적기</b><small>나만의 테마를 만들어요</small></span><em>{chosenMode === 'CUSTOM' ? '✓' : '›'}</em>
             </button>
           </div>
-          {project.mode === 'CUSTOM' && (
+          {chosenMode === 'CUSTOM' && (
             <label className="custom-theme-input" htmlFor="custom-theme">
               나의 테마 이름
               <input id="custom-theme" value={project.customTheme} maxLength={24} placeholder="예: 친구와 성수동 데이" onChange={(event) => onProjectChange({ customTheme: event.target.value })} />
             </label>
           )}
           <div className="quest-next">
-            <p><i>1</i><span>{project.mode === 'CUSTOM' ? '테마 이름을 확인해 주세요.' : '테마를 누르면 바로 이동해요.'}<br /><small>다음 화면에서 영상을 선택해요.</small></span></p>
-            {project.mode === 'CUSTOM' && <RetroButton className="primary-cta" onClick={goToUpload}>확인 <span>→</span></RetroButton>}
+            <p><i>{chosenMode ? '✓' : '1'}</i><span>{chosenMode ? '테마를 골랐어요.' : '테마 하나를 선택해 주세요.'}<br /><small>다음 화면에서 영상을 선택해요.</small></span></p>
+            <RetroButton className="primary-cta" onClick={goToUpload} disabled={!chosenMode}>다음 <span>→</span></RetroButton>
           </div>
         </section>
       ) : (

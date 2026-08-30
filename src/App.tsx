@@ -67,7 +67,7 @@ function App() {
   }, [toast])
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' })
+    window.scrollTo(0, 0)
   }, [view])
 
   const startNew = useCallback(() => {
