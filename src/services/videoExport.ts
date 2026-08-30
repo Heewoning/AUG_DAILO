@@ -48,11 +48,11 @@ const fitText = (context: CanvasRenderingContext2D, text: string, maxWidth: numb
 }
 
 const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number) => {
-  const panelWidth = width * 0.78
-  const titleHeight = width * 0.075
-  const bodyHeight = width * 0.22
+  const panelWidth = width * 0.64
+  const titleHeight = width * 0.055
+  const bodyHeight = width * 0.105
   const x = (width - panelWidth) / 2
-  const y = height * 0.52
+  const y = (height - titleHeight - bodyHeight) / 2
 
   context.fillStyle = 'rgba(15, 12, 10, .18)'
   context.fillRect(x + 10, y + 12, panelWidth, titleHeight + bodyHeight)
@@ -64,16 +64,14 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.fillStyle = '#0a52b8'
   context.fillRect(x, y, panelWidth, titleHeight)
   context.fillStyle = '#fff'
-  context.font = `700 ${Math.round(width * 0.035)}px Tahoma, Arial, sans-serif`
+  context.font = `700 ${Math.round(width * 0.027)}px Tahoma, Arial, sans-serif`
   context.fillText(`◷  ${clip.displayTime}`, x + width * 0.025, y + titleHeight * 0.68)
 
   context.fillStyle = '#25201d'
-  context.font = `700 ${Math.round(width * 0.044)}px Arial, sans-serif`
-  context.fillText(fitText(context, clip.activity || '오늘의 한 장면', panelWidth - width * 0.08), x + width * 0.04, y + titleHeight + bodyHeight * 0.42)
-  const description = clip.caption || clip.voice?.transcript || '이 장면의 이야기를 적어보세요.'
-  context.fillStyle = '#665a52'
-  context.font = `500 ${Math.round(width * 0.032)}px Arial, sans-serif`
-  context.fillText(fitText(context, description, panelWidth - width * 0.08), x + width * 0.04, y + titleHeight + bodyHeight * 0.72)
+  context.font = `700 ${Math.round(width * 0.036)}px Arial, sans-serif`
+  context.textAlign = 'center'
+  context.fillText(fitText(context, clip.activity || '오늘의 한 장면', panelWidth - width * 0.07), width / 2, y + titleHeight + bodyHeight * 0.62)
+  context.textAlign = 'start'
 
   context.beginPath()
   context.moveTo(x + panelWidth * 0.72, y + titleHeight + bodyHeight)
@@ -85,9 +83,9 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.stroke()
 
   if (clip.popup.enabled) {
-    const popupWidth = width * 0.7
+    const popupWidth = width * 0.56
     const popupX = (width - popupWidth) / 2
-    const popupY = height * 0.17
+    const popupY = height * 0.28
     context.fillStyle = '#fff4c9'
     context.fillRect(popupX, popupY, popupWidth, width * 0.19)
     context.strokeRect(popupX, popupY, popupWidth, width * 0.19)
@@ -100,42 +98,50 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
     context.font = `700 ${Math.round(width * 0.032)}px Arial, sans-serif`
     context.fillText(fitText(context, clip.popup.message, popupWidth - width * 0.08), popupX + width * 0.04, popupY + width * 0.13)
   }
+
+  if (clip.caption) {
+    const captionWidth = width * 0.78
+    context.fillStyle = 'rgba(18, 15, 13, .7)'
+    context.fillRect((width - captionWidth) / 2, height * 0.86, captionWidth, width * 0.09)
+    context.fillStyle = '#fff'
+    context.font = `600 ${Math.round(width * 0.031)}px Arial, sans-serif`
+    context.textAlign = 'center'
+    context.fillText(fitText(context, clip.caption, captionWidth - width * 0.06), width / 2, height * 0.916)
+    context.textAlign = 'start'
+  }
 }
 
-const drawIntro = (context: CanvasRenderingContext2D, width: number, height: number) => {
-  context.fillStyle = '#55a9ee'
+const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProject, width: number, height: number) => {
+  const gradient = context.createLinearGradient(0, 0, 0, height)
+  gradient.addColorStop(0, 'rgba(0,0,0,.08)')
+  gradient.addColorStop(1, 'rgba(0,0,0,.45)')
+  context.fillStyle = gradient
   context.fillRect(0, 0, width, height)
-  context.fillStyle = '#63ad3a'
-  context.beginPath()
-  context.ellipse(width * 0.25, height * 0.9, width * 0.75, height * 0.35, -0.1, 0, Math.PI * 2)
-  context.fill()
-  const boxWidth = width * 0.8
+  const boxWidth = width * 0.68
   const boxX = (width - boxWidth) / 2
-  const boxY = height * 0.34
+  const boxY = height * 0.39
   context.fillStyle = '#f4ead2'
-  context.fillRect(boxX, boxY, boxWidth, width * 0.48)
+  context.fillRect(boxX, boxY, boxWidth, width * 0.26)
   context.strokeStyle = '#143a72'
   context.lineWidth = Math.max(3, width * 0.007)
-  context.strokeRect(boxX, boxY, boxWidth, width * 0.48)
+  context.strokeRect(boxX, boxY, boxWidth, width * 0.26)
   context.fillStyle = '#0754bc'
   context.fillRect(boxX, boxY, boxWidth, width * 0.075)
   context.fillStyle = '#fff'
   context.font = `700 ${Math.round(width * 0.031)}px Tahoma, sans-serif`
-  context.fillText('오늘의 하루.EXE', boxX + width * 0.025, boxY + width * 0.052)
+  context.fillText('DAY IN LIFE.EXE', boxX + width * 0.025, boxY + width * 0.052)
   context.fillStyle = '#25201d'
   context.textAlign = 'center'
-  context.font = `700 ${Math.round(width * 0.052)}px Arial, sans-serif`
-  context.fillText('오늘 하루를 시작할까요?', width / 2, boxY + width * 0.23)
-  context.fillStyle = '#f7f3e8'
-  context.fillRect(width / 2 - width * 0.12, boxY + width * 0.31, width * 0.24, width * 0.085)
-  context.strokeRect(width / 2 - width * 0.12, boxY + width * 0.31, width * 0.24, width * 0.085)
-  context.font = `700 ${Math.round(width * 0.033)}px Tahoma, sans-serif`
-  context.fillText('시작', width / 2, boxY + width * 0.366)
+  context.font = `700 ${Math.round(width * 0.047)}px Arial, sans-serif`
+  context.fillText(fitText(context, project.coverTitle || '오늘의 하루.EXE', boxWidth - width * 0.08), width / 2, boxY + width * 0.17)
   context.textAlign = 'start'
 }
 
 const chooseMimeType = () => {
-  const candidates = ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp8,opus', 'video/webm']
+  const safari = /Safari/i.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg/i.test(navigator.userAgent)
+  const candidates = safari
+    ? ['video/mp4;codecs=h264,aac', 'video/mp4', 'video/webm']
+    : ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=h264,aac']
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
 }
 
@@ -152,8 +158,8 @@ export const renderProject = async (
 
   const isMobile = window.matchMedia('(max-width: 900px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent)
   const canvas = document.createElement('canvas') as CaptureCanvas
-  canvas.width = isMobile ? 720 : 1080
-  canvas.height = isMobile ? 1280 : 1920
+  canvas.width = 1080
+  canvas.height = 1920
   const frameRate = isMobile ? 24 : 30
   const context = canvas.getContext('2d', { alpha: false })
   if (!context) throw new Error('영상 화면을 준비하지 못했어요.')
@@ -170,7 +176,7 @@ export const renderProject = async (
   videoSource.connect(videoGain).connect(audioDestination)
   const combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioDestination.stream.getAudioTracks()])
   const mimeType = chooseMimeType()
-  const options = mimeType ? { mimeType, videoBitsPerSecond: isMobile ? 3_000_000 : 5_000_000 } : undefined
+  const options = mimeType ? { mimeType, videoBitsPerSecond: isMobile ? 8_000_000 : 10_000_000 } : undefined
   let recorder: MediaRecorder
   try {
     recorder = new MediaRecorder(combinedStream, options)
@@ -189,10 +195,29 @@ export const renderProject = async (
   })
 
   try {
+    const coverClip = clips.find((clip) => clip.id === project.coverClipId) ?? clips[0]
+    video.src = coverClip.mediaUrl
+    if (video.readyState < 1) await waitForMedia(video, 'loadedmetadata')
+    await seekVideo(video, coverClip.analysis?.bestMoment ?? Math.min(coverClip.duration * .2, 1))
     recorder.start(400)
-    drawIntro(context, canvas.width, canvas.height)
-    onProgress({ percent: 3, task: '첫 화면을 만들고 있어요' })
-    await delay(700)
+    context.fillStyle = '#111'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    drawCoveredVideo(context, video, canvas.width, canvas.height)
+    drawCoverOverlay(context, project, canvas.width, canvas.height)
+    onProgress({ percent: 3, task: '썸네일을 만들고 있어요' })
+    await delay(850)
+
+    if (project.fastIntro) {
+      for (const clip of clips.slice(0, 6)) {
+        video.src = clip.mediaUrl
+        if (video.readyState < 1) await waitForMedia(video, 'loadedmetadata')
+        await seekVideo(video, clip.analysis?.bestMoment ?? Math.min(clip.duration * .32, Math.max(clip.duration - .1, 0)))
+        context.fillStyle = '#fff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        drawCoveredVideo(context, video, canvas.width, canvas.height)
+        await delay(140)
+      }
+    }
 
     let renderedSeconds = 0
     for (const [index, clip] of clips.entries()) {

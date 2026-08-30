@@ -36,10 +36,10 @@ export const ProgressBar = ({ value }: { value: number }) => (
 )
 
 const navItems: Array<{ view: AppView; icon: string; label: string }> = [
-  { view: 'home', icon: '⌂', label: 'HOME' },
-  { view: 'create', icon: '+', label: 'CREATE' },
-  { view: 'archive', icon: '▣', label: 'ARCHIVE' },
-  { view: 'profile', icon: '○', label: 'PROFILE' },
+  { view: 'home', icon: '⌂', label: '홈' },
+  { view: 'create', icon: '+', label: '만들기' },
+  { view: 'archive', icon: '▣', label: '내 영상' },
+  { view: 'profile', icon: '○', label: '기록' },
 ]
 
 export const BottomNav = ({ current, onChange }: { current: AppView; onChange: (view: AppView) => void }) => (

@@ -11,7 +11,7 @@ export type ProjectMode =
   | 'CUSTOM'
 
 export type Mood = 'BUSY' | 'PRODUCTIVE' | 'TIRED' | 'HAPPY' | 'COZY' | 'CALM'
-export type EditorTab = 'CLIP' | 'TEXT' | 'VOICE' | 'TRANSITION' | 'POPUP'
+export type EditorTab = 'COVER' | 'CLIP' | 'TEXT' | 'VOICE' | 'TRANSITION' | 'POPUP'
 export type Transition = 'AUTO' | 'HARD CUT' | 'FLASH' | 'BLACK SCREEN' | 'PHONE SCREEN' | 'WINDOW POP-UP'
 
 export interface VoiceTrack {
@@ -22,6 +22,14 @@ export interface VoiceTrack {
   volume: number
   fadeIn: boolean
   fadeOut: boolean
+  createdAt: string
+}
+
+export interface ExportedAsset {
+  blob?: Blob
+  url?: string
+  fileName: string
+  mimeType: string
   createdAt: string
 }
 
@@ -75,6 +83,11 @@ export interface DailoProject {
   status: 'DRAFT' | 'READY' | 'EXPORTED'
   preset: 'COZY' | 'FAST' | 'FUNNY' | 'EDITORIAL' | 'RETRO' | 'N-JOB' | 'MINIMAL'
   outputLength: 15 | 30 | 45 | 60 | 90
+  customTheme: string
+  coverClipId?: string
+  coverTitle: string
+  fastIntro: boolean
+  exportAsset?: ExportedAsset
 }
 
 export interface ProjectSummary {
@@ -111,5 +124,8 @@ export const createProject = (mode: ProjectMode = 'DAY IN LIFE'): DailoProject =
     status: 'DRAFT',
     preset: mode === 'N-JOB DAY' ? 'N-JOB' : 'RETRO',
     outputLength: 30,
+    customTheme: '',
+    coverTitle: '오늘의 하루.EXE',
+    fastIntro: true,
   }
 }

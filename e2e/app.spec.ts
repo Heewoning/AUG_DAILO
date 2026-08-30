@@ -1,12 +1,16 @@
 import { expect, test } from '@playwright/test'
 
 test('home to upload thumbnails to editor flow works', async ({ page }) => {
+  test.setTimeout(60_000)
   test.skip(test.info().project.name === 'iphone-webkit', 'WebKit 테스트 런타임은 canvas.captureStream 테스트 픽스처 생성을 지원하지 않음')
+  await page.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { value: undefined }))
   await page.goto('./')
-  await expect(page.getByRole('button', { name: /영상 고르기/ })).toBeVisible()
-  await page.getByRole('button', { name: /영상 고르기/ }).click()
-  await expect(page.getByText('오늘의 테마.EXE')).toBeVisible()
+  await expect(page.getByRole('button', { name: /오늘의 퀘스트 시작/ })).toBeVisible()
+  await page.getByRole('button', { name: /오늘의 퀘스트 시작/ }).click()
+  await expect(page.getByText('QUEST 01')).toBeVisible()
   await page.getByRole('button', { name: /N잡 데이/ }).click()
+  await page.getByRole('button', { name: /다음 퀘스트/ }).click()
+  await expect(page.getByText('QUEST 02')).toBeVisible()
 
   const videoBytes = await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
@@ -42,11 +46,13 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   })
   await expect(page.getByAltText('morning-coffee.webm 대표 장면')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByLabel('morning-coffee.webm 미리보기')).toBeVisible()
-  await page.getByRole('button', { name: /자동으로 정리하고 편집하기/ }).click()
+  await page.getByRole('button', { name: /꾸미기 시작/ }).click()
   await expect(page.getByText('MY_DAY_IS_RUNNING.EXE')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('USER VOICE ONLY')).toHaveCount(0)
   await expect(page.getByLabel('1번 클립 시간')).toBeVisible()
   await expect(page.getByLabel('1번 클립 문구')).toBeVisible()
+  await page.getByRole('button', { name: /설명 녹음/ }).first().click()
+  await expect(page.getByText('이 장면을 내 목소리로 설명해요')).toBeVisible()
 
   await page.getByRole('button', { name: /영상 만들기/ }).click()
   await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 30_000 })
@@ -54,12 +60,21 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await page.getByRole('button', { name: '영상 저장하기' }).click()
   const result = await downloadPromise
   expect(result.suggestedFilename()).toMatch(/^DAY_IN_LIFE_\d{8}\.(webm|mp4)$/)
+  await page.getByRole('button', { name: '닫기' }).click()
+  await page.getByRole('button', { name: '내 영상' }).click()
+  await expect(page.getByText('완성한 브이로그')).toBeVisible()
+  await page.getByRole('button', { name: /오늘의 하루.EXE/ }).click()
+  await expect(page.locator('.archive-player video')).toBeVisible({ timeout: 10_000 })
 })
 
 test('mobile home keeps the primary action and navigation reachable', async ({ page }) => {
   await page.goto('./')
-  await expect(page.getByRole('button', { name: /영상 고르기/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /오늘의 퀘스트 시작/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '주요 메뉴' })).toBeVisible()
-  await page.getByRole('button', { name: /영상 고르기/ }).click()
-  await expect(page.getByRole('button', { name: /영상 선택하기/ })).toBeVisible()
+  await page.getByRole('button', { name: /오늘의 퀘스트 시작/ }).click()
+  await page.getByRole('button', { name: /내가 직접 적기/ }).click()
+  await page.getByLabel('나의 테마 이름').fill('학교 끝나고 친구와')
+  await expect(page.getByRole('button', { name: /다음 퀘스트/ })).toBeVisible()
+  await page.getByRole('button', { name: /다음 퀘스트/ }).click()
+  await expect(page.getByRole('button', { name: /내 영상 고르기/ })).toBeVisible()
 })

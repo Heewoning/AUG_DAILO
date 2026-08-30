@@ -1,16 +1,18 @@
-import type { DailoClip, DailoProject, ProjectSummary, VoiceTrack } from '../types'
+import type { DailoClip, DailoProject, ExportedAsset, ProjectSummary, VoiceTrack } from '../types'
 
 const PROJECT_KEY = 'dailo:projects:v1'
 const DATABASE = 'dailo-media-v1'
 const STORE = 'blobs'
 const persistedVoiceVersions = new Map<string, string>()
+const persistedExportVersions = new Map<string, string>()
 
 type StoredVoice = Omit<VoiceTrack, 'blob' | 'url'> & { hasBlob: boolean }
 type StoredClip = Omit<DailoClip, 'mediaUrl' | 'videoBlob' | 'voice'> & {
   hasVideoBlob: boolean
   voice?: StoredVoice
 }
-type StoredProject = Omit<DailoProject, 'clips'> & { clips: StoredClip[] }
+type StoredExport = Omit<ExportedAsset, 'blob' | 'url'> & { hasBlob: boolean }
+type StoredProject = Omit<DailoProject, 'clips' | 'exportAsset'> & { clips: StoredClip[]; exportAsset?: StoredExport }
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -79,7 +81,17 @@ const toStoredClip = (clip: DailoClip): StoredClip => {
 }
 
 export const saveProject = async (project: DailoProject) => {
-  const stored: StoredProject = { ...project, clips: project.clips.map(toStoredClip) }
+  const { exportAsset, ...projectMetadata } = project
+  const stored: StoredProject = {
+    ...projectMetadata,
+    clips: project.clips.map(toStoredClip),
+    exportAsset: exportAsset ? {
+      fileName: exportAsset.fileName,
+      mimeType: exportAsset.mimeType,
+      createdAt: exportAsset.createdAt,
+      hasBlob: Boolean(exportAsset.blob),
+    } : undefined,
+  }
   const projects = readAll().filter((item) => item.id !== project.id)
   localStorage.setItem(PROJECT_KEY, JSON.stringify([stored, ...projects].slice(0, 30)))
 
@@ -94,6 +106,11 @@ export const saveProject = async (project: DailoProject) => {
     }
     return writes
   }))
+  const exportKey = `${project.id}:export`
+  if (exportAsset?.blob && persistedExportVersions.get(exportKey) !== exportAsset.createdAt) {
+    await putBlob(exportKey, exportAsset.blob, true)
+    persistedExportVersions.set(exportKey, exportAsset.createdAt)
+  }
 }
 
 const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoClip> => {
@@ -123,19 +140,33 @@ export const loadProject = async (id: string): Promise<DailoProject | undefined>
   const project = readAll().find((item) => item.id === id)
   if (!project) return undefined
   const clips = await Promise.all(project.clips.map((clip) => hydrateClip(project.id, clip)))
-  return { ...project, clips }
+  const exportBlob = project.exportAsset?.hasBlob ? await getBlob(`${project.id}:export`) : undefined
+  return {
+    ...project,
+    customTheme: project.customTheme ?? '',
+    coverTitle: project.coverTitle ?? '오늘의 하루.EXE',
+    fastIntro: project.fastIntro ?? true,
+    clips,
+    exportAsset: project.exportAsset ? {
+      fileName: project.exportAsset.fileName,
+      mimeType: project.exportAsset.mimeType,
+      createdAt: project.exportAsset.createdAt,
+      blob: exportBlob,
+      url: exportBlob ? URL.createObjectURL(exportBlob) : undefined,
+    } : undefined,
+  }
 }
 
 export const listProjects = (): ProjectSummary[] =>
   readAll().map((project) => ({
     id: project.id,
-    title: project.title,
+    title: project.coverTitle || project.customTheme || project.title,
     mode: project.mode,
     clipCount: project.clips.length,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     status: project.status,
-    thumbnail: project.clips[0]?.thumbnail ?? '',
+    thumbnail: project.clips.find((clip) => clip.id === project.coverClipId)?.thumbnail ?? project.clips[0]?.thumbnail ?? '',
   }))
 
 export const countRecordedSeconds = () =>

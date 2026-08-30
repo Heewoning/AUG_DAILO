@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { liveTranscriber } from '../services/speech'
 import type { VoiceTrack } from '../types'
 
 export const useVoiceRecorder = (onComplete: (track: VoiceTrack) => void) => {
   const [recording, setRecording] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [transcript, setTranscript] = useState('')
+  const [error, setError] = useState<string>()
   const recorderRef = useRef<MediaRecorder | undefined>(undefined)
   const streamRef = useRef<MediaStream | undefined>(undefined)
   const chunksRef = useRef<Blob[]>([])
@@ -20,57 +20,56 @@ export const useVoiceRecorder = (onComplete: (track: VoiceTrack) => void) => {
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
-    liveTranscriber.stop()
   }, [])
 
   const start = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      throw new Error('이 브라우저에서는 음성 녹음을 지원하지 않습니다.')
-    }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const preferred = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type))
-    const recorder = preferred ? new MediaRecorder(stream, { mimeType: preferred }) : new MediaRecorder(stream)
-    chunksRef.current = []
-    transcriptRef.current = ''
-    setTranscript('')
-    setSeconds(0)
-    recorder.ondataavailable = (event) => {
-      if (event.data.size) chunksRef.current.push(event.data)
-    }
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-      onComplete({
-        blob,
-        url: URL.createObjectURL(blob),
-        duration: (performance.now() - startedAtRef.current) / 1000,
-        transcript: transcriptRef.current.trim(),
-        volume: 100,
-        fadeIn: true,
-        fadeOut: true,
-        createdAt: new Date().toISOString(),
-      })
-      stream.getTracks().forEach((track) => track.stop())
-    }
-    recorderRef.current = recorder
-    streamRef.current = stream
-    startedAtRef.current = performance.now()
-    recorder.start(250)
-    liveTranscriber.start((segment) => {
-      if (segment.final) {
-        transcriptRef.current = `${transcriptRef.current} ${segment.text}`.trim()
-        setTranscript(transcriptRef.current)
-      } else {
-        setTranscript(`${transcriptRef.current} ${segment.text}`.trim())
+    setError(undefined)
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('이 브라우저에서는 음성 녹음을 지원하지 않아요.')
       }
-    })
-    setRecording(true)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const preferred = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type))
+      const recorder = preferred ? new MediaRecorder(stream, { mimeType: preferred }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      transcriptRef.current = ''
+      setTranscript('')
+      setSeconds(0)
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        onComplete({
+          blob,
+          url: URL.createObjectURL(blob),
+          duration: (performance.now() - startedAtRef.current) / 1000,
+          transcript: '',
+          volume: 100,
+          fadeIn: true,
+          fadeOut: true,
+          createdAt: new Date().toISOString(),
+        })
+        stream.getTracks().forEach((track) => track.stop())
+      }
+      recorderRef.current = recorder
+      streamRef.current = stream
+      startedAtRef.current = performance.now()
+      recorder.start(250)
+      setRecording(true)
+    } catch (cause) {
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      setRecording(false)
+      setError(cause instanceof DOMException && cause.name === 'NotAllowedError'
+        ? '마이크 권한이 꺼져 있어요. 브라우저 설정에서 마이크를 허용해 주세요.'
+        : cause instanceof Error ? cause.message : '녹음을 시작하지 못했어요.')
+    }
   }, [onComplete])
 
   const stop = useCallback(() => {
-    liveTranscriber.stop()
     if (recorderRef.current?.state !== 'inactive') recorderRef.current?.stop()
     setRecording(false)
   }, [])
 
-  return { recording, seconds, transcript, transcriptionAvailable: liveTranscriber.available, start, stop }
+  return { recording, seconds, transcript, error, start, stop }
 }
