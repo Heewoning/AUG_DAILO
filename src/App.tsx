@@ -149,17 +149,24 @@ function App() {
 
   const analyze = useCallback(async () => {
     if (!project.clips.length) return
+    const sourceProject = project
+    setSelectedClipId(sourceProject.clips[0]?.id)
+    setView('editor')
     setAnalysisProgress({ current: 0, total: project.clips.length, task: '분석 엔진 시작 중' })
     try {
-      const organized = await analysisProvider.organizeProject(project, setAnalysisProgress)
-      setProject(organized)
-      setSelectedClipId(organized.clips[0]?.id)
-      setView('editor')
+      const organized = await analysisProvider.organizeProject(sourceProject, setAnalysisProgress)
+      setProject((current) => current.id === organized.id ? {
+        ...organized,
+        clips: organized.clips.map((clip) => ({
+          ...clip,
+          thumbnail: current.clips.find((item) => item.id === clip.id)?.thumbnail || clip.thumbnail,
+        })),
+      } : current)
       saveProject(organized)
         .then(() => setProjects(listProjects()))
         .catch(() => setToast('편집 화면은 준비됐어요. 저장 공간을 확인해 주세요.'))
     } catch (error) {
-      setToast(error instanceof Error ? error.message : '클립 정리 중 문제가 생겼어요. 다시 시도해 주세요.')
+      setToast(error instanceof Error ? `편집 화면은 열었어요. 자동 정리만 다시 확인해 주세요: ${error.message}` : '편집 화면은 열었어요. 자동 정리만 다시 시도해 주세요.')
     } finally {
       setAnalysisProgress(undefined)
     }

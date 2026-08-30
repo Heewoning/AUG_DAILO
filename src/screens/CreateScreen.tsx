@@ -43,6 +43,11 @@ export const CreateScreen = ({
     window.setTimeout(() => document.querySelector<HTMLInputElement>('#custom-theme')?.focus(), 0)
   }
 
+  const goToUpload = () => {
+    if (project.mode === 'CUSTOM' && !project.customTheme.trim()) onProjectChange({ customTheme: '나만의 하루' })
+    setStep(2)
+  }
+
   return (
     <main className="screen create-screen create-quest">
       <nav className="quest-steps" aria-label="영상 만들기 단계">
@@ -57,7 +62,7 @@ export const CreateScreen = ({
       {step === 1 ? (
         <section className="theme-step">
           <header className="quest-heading">
-            <span>QUEST 01</span>
+            <span>STEP 01</span>
             <h1>어떤 하루를<br />기록할까요?</h1>
             <p>정답은 없어요. 오늘과 가장 가까운 테마 하나만 골라 주세요.</p>
           </header>
@@ -79,13 +84,13 @@ export const CreateScreen = ({
           )}
           <div className="quest-next">
             <p><i>1</i><span>테마를 골랐어요.<br /><small>다음 화면에서 영상을 선택해요.</small></span></p>
-            <RetroButton className="primary-cta" disabled={project.mode === 'CUSTOM' && !project.customTheme.trim()} onClick={() => setStep(2)}>다음 퀘스트 <span>→</span></RetroButton>
+            <RetroButton className="primary-cta" onClick={goToUpload}>다음 <span>→</span></RetroButton>
           </div>
         </section>
       ) : (
         <section className="upload-step">
           <header className="quest-heading quest-heading--row">
-            <div><span>QUEST 02</span><h1>오늘 찍은 영상을<br />골라 주세요.</h1></div>
+            <div><span>STEP 02</span><h1>오늘 찍은 영상을<br />골라 주세요.</h1></div>
             <button className="back-step" onClick={() => setStep(1)}>← 테마 다시 고르기</button>
           </header>
 
@@ -143,7 +148,7 @@ export const CreateScreen = ({
       {analysisProgress && (
         <div className="modal-backdrop" role="status" aria-live="polite">
           <RetroWindow title="영상 정리 중.EXE" className="render-dialog">
-            <span className="render-symbol">✓</span><h2>마지막 퀘스트를 준비하고 있어요.</h2>
+            <span className="render-symbol">✓</span><h2>편집 화면을 준비하고 있어요.</h2>
             <p>영상 순서와 편집 화면을 정리하고 있어요.</p>
             <ProgressBar value={(analysisProgress.current / analysisProgress.total) * 100} /><small>{analysisProgress.task}</small>
           </RetroWindow>

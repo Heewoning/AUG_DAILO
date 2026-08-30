@@ -269,6 +269,12 @@ export const renderProject = async (
       video.pause()
       renderedSeconds += outputDuration
     }
+    onProgress({ percent: 98, task: '고화질 파일을 마무리하고 있어요' })
+    await delay(500)
+    if (recorder.state === 'recording') {
+      recorder.requestData()
+      await delay(180)
+    }
     recorder.stop()
     const blob = await completed
     onProgress({ percent: 100, task: '영상이 완성됐어요. 저장 버튼을 눌러주세요.' })
