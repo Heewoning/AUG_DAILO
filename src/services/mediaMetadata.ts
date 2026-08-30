@@ -1,5 +1,8 @@
 import { makeId, type DailoClip } from '../types'
 
+const formatCapturedTime = (date: Date) =>
+  `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+
 const waitForMetadata = (video: HTMLVideoElement) =>
   new Promise<void>((resolve, reject) => {
     if (video.readyState >= 1) return resolve()
@@ -72,8 +75,10 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
     trimStart: 0,
     trimEnd: duration,
     capturedAt: capturedAt.toISOString(),
-    displayTime: capturedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    displayTime: formatCapturedTime(capturedAt),
     activity: '',
+    activityEnglish: '',
+    activityIcon: '✦',
     caption: '',
     mood: 'BUSY',
     energy: 70,

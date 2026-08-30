@@ -62,6 +62,8 @@ export interface DailoClip {
   capturedAt: string
   displayTime: string
   activity: string
+  activityEnglish?: string
+  activityIcon?: string
   caption: string
   mood: Mood
   energy: number

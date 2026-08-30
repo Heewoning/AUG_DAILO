@@ -1,4 +1,5 @@
 import type { AnalysisProgress, ClipAnalysis, DailoClip, DailoProject } from '../types'
+import { activityTextProvider } from './activityText'
 
 export interface ClipAnalysisProvider {
   readonly id: string
@@ -56,9 +57,13 @@ export class BrowserMetadataAnalysisProvider implements ClipAnalysisProvider {
     for (const [index, clip] of ordered.entries()) {
       onProgress?.({ current: index + 1, total: ordered.length, task: `CLIP_${String(index + 1).padStart(2, '0')}.MOV 분석 중` })
       const analysis = await this.analyzeClip(clip, index, ordered.length)
+      const activity = clip.activity === 'NEW MOMENT' ? activityFrom(clip) : clip.activity
+      const presentation = activityTextProvider.present(activity)
       clips.push({
         ...clip,
-        activity: clip.activity === 'NEW MOMENT' ? activityFrom(clip) : clip.activity,
+        activity,
+        activityEnglish: presentation.english,
+        activityIcon: presentation.icon,
         mood: analysis.sceneType === 'NIGHT' ? 'TIRED' : analysis.sceneType === 'MORNING' ? 'COZY' : 'BUSY',
         energy: Math.max(8, Math.round(94 - (index / Math.max(ordered.length - 1, 1)) * 76)),
         trimStart: Math.min(0.25, clip.duration * 0.05),

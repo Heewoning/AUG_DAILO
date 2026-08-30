@@ -425,6 +425,41 @@ button { cursor: pointer; }
   .monthly-log .retro-window__body > * { grid-column: 1 !important; }
 }
 
+/* Reference-led vlog composition: full video first, tiny XP details second. */
+.phone-preview video { object-fit: cover; }
+.reference-cover-overlay,
+.reference-scene-overlay { position: absolute; z-index: 3; left: 7%; right: 7%; top: 50%; transform: translateY(-50%); color: #fff; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,.9), 1px 1px 0 #111; pointer-events: none; }
+.xp-cover-tag,
+.xp-scene-tag { width: max-content; max-width: 100%; min-height: 22px; margin: 0 auto 12px; padding: 3px 4px 3px 7px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.9); border-radius: 5px 5px 2px 2px; color: #fff; background: linear-gradient(#2e86e5,#0749a8); box-shadow: 2px 2px 0 rgba(0,0,0,.28); font: 800 9px/1 Tahoma, "Malgun Gothic", sans-serif; letter-spacing: .02em; text-shadow: 1px 1px #153c73; }
+.xp-cover-tag i,
+.xp-scene-tag i { width: 17px; height: 17px; display: grid; place-items: center; border-radius: 3px; background: #f5ca55; color: #30241d; font-size: 10px; font-style: normal; text-shadow: none; }
+.xp-cover-tag b,
+.xp-scene-tag b { width: 17px; height: 17px; margin-left: 3px; display: grid; place-items: center; border: 1px solid #fff; border-radius: 3px; background: #d84b2f; font-size: 11px; }
+.reference-cover-overlay > small { display: block; margin-bottom: 9px; color: #fff1a8; font: 800 10px/1.2 Tahoma, sans-serif; letter-spacing: .04em; }
+.reference-cover-overlay h2 { margin: 0 auto; max-width: 92%; color: #fff; font: 950 clamp(30px,4.5vw,58px)/.95 "Arial Black", "Malgun Gothic", sans-serif; letter-spacing: -.07em; -webkit-text-stroke: 1.5px #29211d; paint-order: stroke fill; filter: drop-shadow(3px 4px 0 rgba(0,0,0,.55)); word-break: keep-all; }
+.reference-cover-overlay p { width: max-content; max-width: 88%; margin: 15px auto 0; padding: 6px 12px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; background: rgba(17,14,12,.76); color: #fff; font: 700 9px/1.2 Tahoma, sans-serif; text-shadow: none; }
+.reference-scene-overlay time { display: block; font: 300 clamp(29px,3.4vw,46px)/1 Tahoma, sans-serif; letter-spacing: -.08em; }
+.reference-scene-overlay strong { display: block; margin-top: 6px; font: 800 clamp(16px,2vw,28px)/1.15 "Malgun Gothic", sans-serif; word-break: keep-all; }
+.reference-scene-overlay > small { display: block; margin-top: 5px; color: rgba(255,255,255,.88); font: 500 clamp(9px,1vw,13px)/1.25 Tahoma, sans-serif; }
+.compact-video-popup { top: 17%; left: 17%; right: 17%; opacity: .94; }
+.compact-video-popup .retro-window__body { padding: 8px; }
+.compact-video-popup .retro-button { display: none; }
+.auto-english { display: block; min-height: 16px; margin-top: 4px; overflow: hidden; color: var(--blue); font: 700 9px/1.25 Tahoma, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.field-help { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 500; }
+.translation-preview { margin: -4px 0 18px; padding: 11px 12px; display: flex; align-items: center; gap: 11px; border: 1px solid #8e9fba; background: #eef5ff; }
+.translation-preview > i { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #97711d; border-radius: 4px; background: var(--butter); font-size: 18px; font-style: normal; }
+.translation-preview span { min-width: 0; }
+.translation-preview small,
+.translation-preview b { display: block; }
+.translation-preview small { color: var(--blue); font: 800 9px/1 Tahoma, sans-serif; }
+.translation-preview b { margin-top: 5px; overflow: hidden; font: 800 13px/1.2 Tahoma, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1099px) {
+  .reference-cover-overlay h2 { font-size: clamp(32px,8vw,54px); }
+  .reference-scene-overlay time { font-size: clamp(32px,8vw,46px); }
+  .reference-scene-overlay strong { font-size: clamp(18px,5vw,26px); }
+}
+
 /* Mobile editor becomes a touch-first stacked workspace. */
 @media (max-width: 1099px) {
   .app-shell--editor { min-width: 0; padding-bottom: 82px; }

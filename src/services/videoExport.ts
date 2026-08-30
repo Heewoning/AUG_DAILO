@@ -1,4 +1,5 @@
 import type { DailoClip, DailoProject } from '../types'
+import { activityTextProvider } from './activityText'
 
 export interface ExportProgress {
   percent: number
@@ -48,39 +49,37 @@ const fitText = (context: CanvasRenderingContext2D, text: string, maxWidth: numb
 }
 
 const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number) => {
-  const panelWidth = width * 0.64
-  const titleHeight = width * 0.055
-  const bodyHeight = width * 0.105
-  const x = (width - panelWidth) / 2
-  const y = (height - titleHeight - bodyHeight) / 2
-
-  context.fillStyle = 'rgba(15, 12, 10, .18)'
-  context.fillRect(x + 10, y + 12, panelWidth, titleHeight + bodyHeight)
-  context.fillStyle = '#f5edda'
-  context.fillRect(x, y, panelWidth, titleHeight + bodyHeight)
-  context.strokeStyle = '#3d2a21'
-  context.lineWidth = Math.max(3, width * 0.006)
-  context.strokeRect(x, y, panelWidth, titleHeight + bodyHeight)
-  context.fillStyle = '#0a52b8'
-  context.fillRect(x, y, panelWidth, titleHeight)
+  const presentation = activityTextProvider.present(clip.activity)
+  const centerY = height * 0.5
+  const tagWidth = width * 0.38
+  const tagHeight = width * 0.055
+  const tagX = (width - tagWidth) / 2
+  const tagY = centerY - width * 0.19
+  context.fillStyle = 'rgba(8, 32, 73, .92)'
+  context.fillRect(tagX, tagY, tagWidth, tagHeight)
+  context.strokeStyle = 'rgba(255,255,255,.9)'
+  context.lineWidth = Math.max(2, width * 0.003)
+  context.strokeRect(tagX, tagY, tagWidth, tagHeight)
   context.fillStyle = '#fff'
-  context.font = `700 ${Math.round(width * 0.027)}px Tahoma, Arial, sans-serif`
-  context.fillText(`◷  ${clip.displayTime}`, x + width * 0.025, y + titleHeight * 0.68)
-
-  context.fillStyle = '#25201d'
-  context.font = `700 ${Math.round(width * 0.036)}px Arial, sans-serif`
   context.textAlign = 'center'
-  context.fillText(fitText(context, clip.activity || '오늘의 한 장면', panelWidth - width * 0.07), width / 2, y + titleHeight + bodyHeight * 0.62)
-  context.textAlign = 'start'
+  context.font = `700 ${Math.round(width * 0.022)}px Tahoma, Arial, sans-serif`
+  context.fillText(`${clip.activityIcon || presentation.icon}  CLIP_INFO.EXE`, width / 2, tagY + tagHeight * .68)
 
-  context.beginPath()
-  context.moveTo(x + panelWidth * 0.72, y + titleHeight + bodyHeight)
-  context.lineTo(x + panelWidth * 0.79, y + titleHeight + bodyHeight + width * 0.06)
-  context.lineTo(x + panelWidth * 0.83, y + titleHeight + bodyHeight)
-  context.closePath()
-  context.fillStyle = '#f5edda'
-  context.fill()
-  context.stroke()
+  context.lineWidth = Math.max(3, width * .006)
+  context.strokeStyle = 'rgba(0,0,0,.88)'
+  context.fillStyle = '#fff'
+  context.font = `300 ${Math.round(width * 0.085)}px Tahoma, Arial, sans-serif`
+  context.strokeText(clip.displayTime, width / 2, centerY)
+  context.fillText(clip.displayTime, width / 2, centerY)
+  context.font = `800 ${Math.round(width * 0.055)}px Arial, sans-serif`
+  const korean = fitText(context, clip.activity || '이 장면의 문구를 입력해 주세요', width * .82)
+  context.strokeText(korean, width / 2, centerY + width * .075)
+  context.fillText(korean, width / 2, centerY + width * .075)
+  context.font = `500 ${Math.round(width * 0.03)}px Tahoma, Arial, sans-serif`
+  const english = fitText(context, clip.activityEnglish || presentation.english, width * .78)
+  context.strokeText(english, width / 2, centerY + width * .125)
+  context.fillText(english, width / 2, centerY + width * .125)
+  context.textAlign = 'start'
 
   if (clip.popup.enabled) {
     const popupWidth = width * 0.56
@@ -117,23 +116,35 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   gradient.addColorStop(1, 'rgba(0,0,0,.45)')
   context.fillStyle = gradient
   context.fillRect(0, 0, width, height)
-  const boxWidth = width * 0.68
-  const boxX = (width - boxWidth) / 2
-  const boxY = height * 0.39
-  context.fillStyle = '#f4ead2'
-  context.fillRect(boxX, boxY, boxWidth, width * 0.26)
-  context.strokeStyle = '#143a72'
-  context.lineWidth = Math.max(3, width * 0.007)
-  context.strokeRect(boxX, boxY, boxWidth, width * 0.26)
+  const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
+  const presentation = activityTextProvider.present(coverClip?.activity ?? '')
+  const tagWidth = width * .52
+  const tagX = (width - tagWidth) / 2
+  const tagY = height * .37
   context.fillStyle = '#0754bc'
-  context.fillRect(boxX, boxY, boxWidth, width * 0.075)
+  context.fillRect(tagX, tagY, tagWidth, width * 0.065)
+  context.strokeStyle = '#fff'
+  context.lineWidth = Math.max(2, width * .003)
+  context.strokeRect(tagX, tagY, tagWidth, width * .065)
   context.fillStyle = '#fff'
-  context.font = `700 ${Math.round(width * 0.031)}px Tahoma, sans-serif`
-  context.fillText('DAY IN LIFE.EXE', boxX + width * 0.025, boxY + width * 0.052)
-  context.fillStyle = '#25201d'
   context.textAlign = 'center'
-  context.font = `700 ${Math.round(width * 0.047)}px Arial, sans-serif`
-  context.fillText(fitText(context, project.coverTitle || '오늘의 하루.EXE', boxWidth - width * 0.08), width / 2, boxY + width * 0.17)
+  context.font = `700 ${Math.round(width * 0.026)}px Tahoma, sans-serif`
+  context.fillText(`${presentation.icon}  DAY_IN_LIFE.EXE   ×`, width / 2, tagY + width * .045)
+  context.fillStyle = '#fff1a8'
+  context.font = `800 ${Math.round(width * 0.025)}px Tahoma, sans-serif`
+  context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', width / 2, tagY + width * .12)
+  context.fillStyle = '#fff'
+  context.strokeStyle = 'rgba(24,18,14,.95)'
+  context.lineWidth = Math.max(5, width * .009)
+  context.textAlign = 'center'
+  context.font = `900 ${Math.round(width * 0.09)}px Arial, sans-serif`
+  const title = fitText(context, project.coverTitle || '오늘의 하루.EXE', width * .84)
+  context.strokeText(title, width / 2, tagY + width * .25)
+  context.fillText(title, width / 2, tagY + width * .25)
+  context.font = `600 ${Math.round(width * .03)}px Tahoma, sans-serif`
+  const english = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
+  context.strokeText(english, width / 2, tagY + width * .32)
+  context.fillText(english, width / 2, tagY + width * .32)
   context.textAlign = 'start'
 }
 

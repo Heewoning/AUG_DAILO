@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { moods, popupSuggestions } from '../data'
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import { formatDuration } from '../services/mediaMetadata'
+import { activityTextProvider } from '../services/activityText'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
 import type { DailoClip, DailoProject, EditorTab, Transition, VoiceTrack } from '../types'
 
@@ -49,6 +50,17 @@ export const EditorScreen = ({
   const updatePopup = (patch: Partial<DailoClip['popup']>) =>
     onUpdateClip(selected.id, { popup: { ...selected.popup, ...patch } })
 
+  const updateActivity = (clip: DailoClip, activity: string) => {
+    const presentation = activityTextProvider.present(activity)
+    onUpdateClip(clip.id, { activity, activityEnglish: presentation.english, activityIcon: presentation.icon })
+  }
+
+  const selectedPresentation = activityTextProvider.present(selected.activity)
+  const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
+  const previewClip = tab === 'COVER' ? coverClip : selected
+  const previewPresentation = activityTextProvider.present(previewClip.activity)
+  const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
+
   return (
     <main className="editor-screen">
       <header className="editor-header">
@@ -79,8 +91,8 @@ export const EditorScreen = ({
                   <span><b>{clip.displayTime}</b><small>{clip.name}</small></span>
                 </button>
                 <div className="clip-sidebar-card__fields">
-                  <label><span>시간</span><input aria-label={`${index + 1}번 클립 시간`} value={clip.displayTime} onChange={(event) => onUpdateClip(clip.id, { displayTime: event.target.value })} /></label>
-                  <label className="clip-copy-field"><span>장면 문구</span><input aria-label={`${index + 1}번 클립 문구`} value={clip.activity} placeholder="예: 퇴근 후 카페" onChange={(event) => onUpdateClip(clip.id, { activity: event.target.value })} /></label>
+                  <label><span>촬영 시간 · 자동</span><input aria-label={`${index + 1}번 클립 시간`} value={clip.displayTime} onChange={(event) => onUpdateClip(clip.id, { displayTime: event.target.value })} /></label>
+                  <label className="clip-copy-field"><span>장면 문구</span><input aria-label={`${index + 1}번 클립 문구`} value={clip.activity} placeholder="예: 퇴근 후 카페" onChange={(event) => updateActivity(clip, event.target.value)} /><small className="auto-english">{clip.activityIcon || activityTextProvider.present(clip.activity).icon} EN · {clip.activityEnglish || activityTextProvider.present(clip.activity).english}</small></label>
                   <button type="button" className="clip-record-shortcut" onClick={() => { onSelect(clip.id); setTab('VOICE') }}>● 설명 녹음</button>
                 </div>
               </article>
@@ -91,15 +103,26 @@ export const EditorScreen = ({
         <section className="preview-column">
           <div className="preview-label"><span>LIVE PREVIEW · 9:16</span><span>{formatDuration(selected.duration)}</span></div>
           <div className="phone-preview">
-            <video key={selected.id} src={selected.mediaUrl} controls playsInline preload="metadata" />
+            <video key={previewClip.id} src={previewClip.mediaUrl} controls playsInline preload="metadata" />
             <div className="video-gradient" />
-            <div className="clip-speech-preview scene-message-card">
-              <header>◷ {selected.displayTime}</header>
-              <div><b>{selected.activity || '이 장면의 문구를 입력해 주세요'}</b></div>
-            </div>
-            {selected.caption && <p className="manual-video-caption">{selected.caption}</p>}
-            {selected.popup.enabled && (
-              <RetroWindow title={selected.popup.title} className="video-popup">
+            {tab === 'COVER' ? (
+              <div className="reference-cover-overlay">
+                <span className="xp-cover-tag"><i>{previewPresentation.icon}</i> DAY_IN_LIFE.EXE <b>×</b></span>
+                <small>{project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY'}</small>
+                <h2>{project.coverTitle || '오늘의 하루'}</h2>
+                <p>{coverEnglish}</p>
+              </div>
+            ) : (
+              <div className="reference-scene-overlay">
+                <span className="xp-scene-tag"><i>{selected.activityIcon || selectedPresentation.icon}</i> CLIP_INFO.EXE <b>×</b></span>
+                <time>{selected.displayTime}</time>
+                <strong>{selected.activity || '이 장면의 문구를 입력해 주세요'}</strong>
+                <small>{selected.activityEnglish || selectedPresentation.english}</small>
+              </div>
+            )}
+            {selected.caption && tab !== 'COVER' && <p className="manual-video-caption">{selected.caption}</p>}
+            {selected.popup.enabled && tab !== 'COVER' && (
+              <RetroWindow title={selected.popup.title} className="video-popup compact-video-popup">
                 <div><span className="warning-icon">!</span><b>{selected.popup.message}</b></div>
                 <RetroButton>{selected.popup.button}</RetroButton>
               </RetroWindow>
@@ -120,7 +143,7 @@ export const EditorScreen = ({
               <label>썸네일 제목<input value={project.coverTitle} maxLength={24} onChange={(event) => onUpdateProject({ coverTitle: event.target.value })} /></label>
               <p className="suggestion-label">대표 장면 선택</p>
               <div className="cover-choices">
-                {project.clips.map((clip, index) => <button key={clip.id} className={(project.coverClipId ?? project.clips[0]?.id) === clip.id ? 'active' : ''} onClick={() => onUpdateProject({ coverClipId: clip.id })}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 썸네일`} /> : <span>VIDEO</span>}<i>{index + 1}</i></button>)}
+                {project.clips.map((clip, index) => <button key={clip.id} className={(project.coverClipId ?? project.clips[0]?.id) === clip.id ? 'active' : ''} onClick={() => { onUpdateProject({ coverClipId: clip.id }); onSelect(clip.id) }}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 썸네일`} /> : <span>VIDEO</span>}<i>{index + 1}</i></button>)}
               </div>
               <label className="toggle-field"><span>빠른 오프닝<small>썸네일 다음에 장면들이 빠르게 지나가요</small></span><input type="checkbox" checked={project.fastIntro} onChange={(event) => onUpdateProject({ fastIntro: event.target.checked })} /></label>
             </div>
@@ -128,8 +151,9 @@ export const EditorScreen = ({
 
           {tab === 'CLIP' && (
             <div className="inspector-panel">
-              <label>시간<input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /></label>
-              <label>장면 문구<input value={selected.activity} onChange={(event) => onUpdateClip(selected.id, { activity: event.target.value })} /></label>
+              <label>촬영 시간 <span>AUTO</span><input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /><small className="field-help">영상 선택 시 촬영 정보와 자동 연동돼요.</small></label>
+              <label>장면 문구<input value={selected.activity} placeholder="예: 다이소 출근" onChange={(event) => updateActivity(selected, event.target.value)} /></label>
+              <div className="translation-preview"><i>{selected.activityIcon || selectedPresentation.icon}</i><span><small>AUTO ENGLISH</small><b>{selected.activityEnglish || selectedPresentation.english}</b></span></div>
               <details className="advanced-tools">
                 <summary>상세 편집 열기</summary>
                 <div className="field-row"><label>시작 위치<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>끝 위치<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>

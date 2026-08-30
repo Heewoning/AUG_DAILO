@@ -1,4 +1,5 @@
 import type { DailoClip, DailoProject, ExportedAsset, ProjectSummary, VoiceTrack } from '../types'
+import { activityTextProvider } from './activityText'
 
 const PROJECT_KEY = 'dailo:projects:v1'
 const DATABASE = 'dailo-media-v1'
@@ -117,8 +118,11 @@ const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoCl
   const videoBlob = clip.hasVideoBlob ? await getBlob(`${projectId}:${clip.id}:video`) : undefined
   const voiceBlob = clip.voice?.hasBlob ? await getBlob(`${projectId}:${clip.id}:voice`) : undefined
   const { hasVideoBlob: _hasVideoBlob, voice, ...metadata } = clip
+  const presentation = activityTextProvider.present(metadata.activity)
   return {
     ...metadata,
+    activityEnglish: metadata.activityEnglish || presentation.english,
+    activityIcon: metadata.activityIcon || presentation.icon,
     mediaUrl: videoBlob ? URL.createObjectURL(videoBlob) : '',
     videoBlob,
     voice: voice
