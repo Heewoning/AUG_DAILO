@@ -93,10 +93,17 @@ function App() {
       for (let index = 0; index < files.length; index += 2) {
         const results = await Promise.allSettled(files.slice(index, index + 2).map((file) => fileToClip(file, { thumbnail: false })))
         const batch = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
+          .sort((first, second) => new Date(first.capturedAt).getTime() - new Date(second.capturedAt).getTime())
         if (!batch.length) continue
         loadedCount += batch.length
         thumbnailQueue.push(...batch)
-        setProject((current) => ({ ...current, clips: [...current.clips, ...batch], updatedAt: new Date().toISOString() }))
+        setProject((current) => ({
+          ...current,
+          clips: [...current.clips, ...batch].sort(
+            (first, second) => new Date(first.capturedAt).getTime() - new Date(second.capturedAt).getTime(),
+          ),
+          updatedAt: new Date().toISOString(),
+        }))
         setSelectedClipId((current) => current ?? batch[0]?.id)
         setLoadingFiles(false)
       }
@@ -186,7 +193,15 @@ function App() {
     setExportState({ percent: 1, task: '렌더링 엔진 확인 중' })
     try {
       if (!canRenderVideo()) throw new Error('이 브라우저는 합성 영상 내보내기를 지원하지 않아요. 최신 Safari 또는 Chrome에서 다시 시도해 주세요.')
-      const result = await renderProject(project, setExportState)
+      let result
+      try {
+        result = await renderProject(project, setExportState)
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('비어 있어요')) throw error
+        setExportState({ percent: 2, task: '모바일 렌더링을 한 번 더 연결하고 있어요' })
+        await new Promise((resolve) => window.setTimeout(resolve, 350))
+        result = await renderProject(project, setExportState)
+      }
       const fileDate = new Date().toLocaleDateString('en-CA').replaceAll('-', '')
       setExportedVideo({ blob: result.blob, fileName: `DAY_IN_LIFE_${fileDate}.${result.extension}` })
       const asset = {

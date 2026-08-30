@@ -32,7 +32,7 @@ export const HomeScreen = ({ projects, onCreate, onOpenProject }: HomeProps) => 
         <div className="simple-hero-window">
           <RetroWindow title="내 하루 시작하기.EXE" className="hero-window">
             <DayLauncherArt />
-            <div className="launcher-ready"><span><i /> 준비 완료</span><RetroButton onClick={onCreate}>START</RetroButton></div>
+            <div className="launcher-ready"><span><i /> SYSTEM READY</span><small>위의 ‘영상 만들기 시작’을 눌러 주세요.</small></div>
           </RetroWindow>
         </div>
       </section>

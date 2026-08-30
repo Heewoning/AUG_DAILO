@@ -101,10 +101,11 @@ export const EditorScreen = ({
         </aside>
 
         <section className="preview-column">
-          <div className="preview-label"><span>LIVE PREVIEW · 9:16</span><span>{formatDuration(selected.duration)}</span></div>
+          <div className="preview-label"><span>실시간 미리보기 · 9:16</span><span>{formatDuration(selected.duration)}</span></div>
           <div className="phone-preview">
             <video key={previewClip.id} src={previewClip.mediaUrl} controls playsInline preload="metadata" />
             <div className="video-gradient" />
+            {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
             {tab === 'COVER' ? (
               <div className="reference-cover-overlay">
                 <span className="xp-cover-tag"><i>{previewPresentation.icon}</i> DAY_IN_LIFE.EXE <b>×</b></span>
@@ -128,11 +129,12 @@ export const EditorScreen = ({
               </RetroWindow>
             )}
           </div>
-          <div className="preview-meta"><span>PREVIEW QUALITY · PROXY</span><span>1080 × 1920 EXPORT</span></div>
+          <div className="preview-meta"><span>미리보기 화질 · 가볍게</span><span>저장 화질 · 1080 × 1920</span></div>
         </section>
 
         <aside className="inspector">
           <header><span>CLIP_{String(project.clips.indexOf(selected) + 1).padStart(2, '0')}.MOV</span><button>×</button></header>
+          <p className="mobile-tool-title">편집 도구 <small>아래 메뉴를 눌러 바로 수정하세요.</small></p>
           <nav className="tool-tabs" aria-label="편집 도구">
             {tabs.map((item) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{tabLabels[item]}</button>)}
           </nav>

@@ -118,7 +118,7 @@ export const CreateScreen = ({
           {project.clips.length > 0 && (
             <section className="clip-review quest-review">
               <div className="section-heading">
-                <div><span>{String(project.clips.length).padStart(2, '0')}</span><h2>고른 영상 확인</h2></div>
+                <div><span>{String(project.clips.length).padStart(2, '0')}</span><h2>고른 영상 확인</h2><small>촬영 시간순으로 자동 정리됐어요.</small></div>
                 <button onClick={() => inputRef.current?.click()}>+ 더 추가하기</button>
               </div>
               <div className="clip-review__content">
@@ -133,7 +133,7 @@ export const CreateScreen = ({
                         {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <span className="thumbnail-loading">미리보기 준비 중</span>}
                         <i>{String(index + 1).padStart(2, '0')}</i><em>▶</em>
                       </button>
-                      <div><b>{clip.name}</b><small>{clip.displayTime} · {formatDuration(clip.duration)}</small></div>
+                      <div><b>{clip.name}</b><small>{clip.displayTime} 촬영 · {formatDuration(clip.duration)}</small><em>{clip.capturedAtSource === 'embedded-metadata' ? '원본 촬영정보' : '파일 날짜 기준'}</em></div>
                       <nav aria-label={`${clip.name} 순서 조절`}>
                         <button onClick={() => onMove(clip.id, -1)} disabled={index === 0}>←</button>
                         <button onClick={() => onMove(clip.id, 1)} disabled={index === project.clips.length - 1}>→</button>

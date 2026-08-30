@@ -3,6 +3,71 @@ import { makeId, type DailoClip } from '../types'
 const formatCapturedTime = (date: Date) =>
   `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 
+const readBoxHeader = async (file: File, offset: number) => {
+  const buffer = await file.slice(offset, Math.min(offset + 16, file.size)).arrayBuffer()
+  if (buffer.byteLength < 8) return undefined
+  const view = new DataView(buffer)
+  let size = view.getUint32(0)
+  const type = String.fromCharCode(...new Uint8Array(buffer, 4, 4))
+  let headerSize = 8
+  if (size === 1 && buffer.byteLength >= 16) {
+    const largeSize = view.getBigUint64(8)
+    if (largeSize > BigInt(Number.MAX_SAFE_INTEGER)) return undefined
+    size = Number(largeSize)
+    headerSize = 16
+  } else if (size === 0) size = file.size - offset
+  if (size < headerSize) return undefined
+  return { type, size, headerSize }
+}
+
+const quickTimeDate = (seconds: bigint | number) => {
+  const value = typeof seconds === 'bigint' ? Number(seconds) : seconds
+  const milliseconds = (value - 2_082_844_800) * 1000
+  const date = new Date(milliseconds)
+  const latest = Date.now() + 24 * 60 * 60 * 1000
+  return Number.isFinite(milliseconds) && date.getFullYear() >= 2000 && date.getTime() <= latest ? date : undefined
+}
+
+const readMovieHeaderDate = async (file: File) => {
+  let offset = 0
+  for (let boxes = 0; offset + 8 <= file.size && boxes < 64; boxes += 1) {
+    const box = await readBoxHeader(file, offset)
+    if (!box) break
+    if (box.type === 'moov') {
+      let childOffset = offset + box.headerSize
+      const boxEnd = Math.min(offset + box.size, file.size)
+      for (let children = 0; childOffset + 8 <= boxEnd && children < 128; children += 1) {
+        const child = await readBoxHeader(file, childOffset)
+        if (!child) break
+        if (child.type === 'mvhd') {
+          const payload = await file.slice(childOffset + child.headerSize, childOffset + child.headerSize + 20).arrayBuffer()
+          if (payload.byteLength < 8) return undefined
+          const view = new DataView(payload)
+          return view.getUint8(0) === 1 && payload.byteLength >= 12
+            ? quickTimeDate(view.getBigUint64(4))
+            : quickTimeDate(view.getUint32(4))
+        }
+        childOffset += child.size
+      }
+      break
+    }
+    offset += box.size
+  }
+  return undefined
+}
+
+export const readCapturedAt = async (file: File) => {
+  if (/\.(mp4|mov|m4v)$/i.test(file.name) || /video\/(mp4|quicktime|x-m4v)/i.test(file.type)) {
+    try {
+      const embedded = await readMovieHeaderDate(file)
+      if (embedded) return { date: embedded, source: 'embedded-metadata' as const }
+    } catch {
+      // Some shared or edited files strip the movie header date. File date remains the safest fallback.
+    }
+  }
+  return { date: new Date(file.lastModified || Date.now()), source: 'file-date' as const }
+}
+
 const waitForMetadata = (video: HTMLVideoElement) =>
   new Promise<void>((resolve, reject) => {
     if (video.readyState >= 1) return resolve()
@@ -58,10 +123,10 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
   video.muted = true
   video.playsInline = true
   video.src = mediaUrl
-  await waitForMetadata(video)
+  const [, captured] = await Promise.all([waitForMetadata(video), readCapturedAt(file)])
   const duration = Number.isFinite(video.duration) ? video.duration : 0
   const thumbnail = options.thumbnail === false ? '' : await createThumbnail(video, duration)
-  const capturedAt = new Date(file.lastModified || Date.now())
+  const capturedAt = captured.date
   video.removeAttribute('src')
   video.load()
 
@@ -75,6 +140,7 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
     trimStart: 0,
     trimEnd: duration,
     capturedAt: capturedAt.toISOString(),
+    capturedAtSource: captured.source,
     displayTime: formatCapturedTime(capturedAt),
     activity: '',
     activityEnglish: '',

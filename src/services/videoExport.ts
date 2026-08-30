@@ -7,6 +7,7 @@ export interface ExportProgress {
 }
 
 type CaptureCanvas = HTMLCanvasElement & { captureStream(frameRate?: number): MediaStream }
+type FrameTrack = MediaStreamTrack & { requestFrame?: () => void }
 
 const delay = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
@@ -118,8 +119,9 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.fillRect(0, 0, width, height)
   const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
   const presentation = activityTextProvider.present(coverClip?.activity ?? '')
-  const tagWidth = width * .52
-  const tagX = (width - tagWidth) / 2
+  const safeCenterX = width * .46
+  const tagWidth = width * .48
+  const tagX = safeCenterX - tagWidth / 2
   const tagY = height * .37
   context.fillStyle = '#0754bc'
   context.fillRect(tagX, tagY, tagWidth, width * 0.065)
@@ -129,22 +131,22 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.fillStyle = '#fff'
   context.textAlign = 'center'
   context.font = `700 ${Math.round(width * 0.026)}px Tahoma, sans-serif`
-  context.fillText(`${presentation.icon}  DAY_IN_LIFE.EXE   ×`, width / 2, tagY + width * .045)
+  context.fillText(`${presentation.icon}  DAY_IN_LIFE.EXE   ×`, safeCenterX, tagY + width * .045)
   context.fillStyle = '#fff1a8'
   context.font = `800 ${Math.round(width * 0.025)}px Tahoma, sans-serif`
-  context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', width / 2, tagY + width * .12)
+  context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', safeCenterX, tagY + width * .12)
   context.fillStyle = '#fff'
   context.strokeStyle = 'rgba(24,18,14,.95)'
   context.lineWidth = Math.max(5, width * .009)
   context.textAlign = 'center'
   context.font = `900 ${Math.round(width * 0.09)}px Arial, sans-serif`
-  const title = fitText(context, project.coverTitle || '오늘의 하루.EXE', width * .84)
-  context.strokeText(title, width / 2, tagY + width * .25)
-  context.fillText(title, width / 2, tagY + width * .25)
+  const title = fitText(context, project.coverTitle || '오늘의 하루.EXE', width * .72)
+  context.strokeText(title, safeCenterX, tagY + width * .25)
+  context.fillText(title, safeCenterX, tagY + width * .25)
   context.font = `600 ${Math.round(width * .03)}px Tahoma, sans-serif`
   const english = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
-  context.strokeText(english, width / 2, tagY + width * .32)
-  context.fillText(english, width / 2, tagY + width * .32)
+  context.strokeText(english, safeCenterX, tagY + width * .32)
+  context.fillText(english, safeCenterX, tagY + width * .32)
   context.textAlign = 'start'
 }
 
@@ -175,7 +177,13 @@ export const renderProject = async (
   const context = canvas.getContext('2d', { alpha: false })
   if (!context) throw new Error('영상 화면을 준비하지 못했어요.')
 
-  const canvasStream = canvas.captureStream(frameRate)
+  const manualStream = canvas.captureStream(0)
+  const manualTrack = manualStream.getVideoTracks()[0] as FrameTrack | undefined
+  const canvasStream = manualTrack?.requestFrame ? manualStream : canvas.captureStream(frameRate)
+  if (canvasStream !== manualStream) manualStream.getTracks().forEach((track) => track.stop())
+  const forceFrame = () => {
+    try { (canvasStream.getVideoTracks()[0] as FrameTrack | undefined)?.requestFrame?.() } catch { /* automatic frame capture remains active */ }
+  }
   const audioContext = new AudioContext()
   await audioContext.resume()
   const audioDestination = audioContext.createMediaStreamDestination()
@@ -195,7 +203,14 @@ export const renderProject = async (
     recorder = new MediaRecorder(canvasStream, options)
   }
   const chunks: Blob[] = []
-  recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
+  let markChunkReady: (() => void) | undefined
+  const chunkReady = new Promise<void>((resolve) => { markChunkReady = resolve })
+  recorder.ondataavailable = (event) => {
+    if (!event.data.size) return
+    chunks.push(event.data)
+    markChunkReady?.()
+    markChunkReady = undefined
+  }
   const completed = new Promise<Blob>((resolve, reject) => {
     recorder.onerror = () => reject(new Error('영상 파일을 만드는 중 문제가 생겼어요.'))
     recorder.onstop = () => {
@@ -215,6 +230,7 @@ export const renderProject = async (
     context.fillRect(0, 0, canvas.width, canvas.height)
     drawCoveredVideo(context, video, canvas.width, canvas.height)
     drawCoverOverlay(context, project, canvas.width, canvas.height)
+    forceFrame()
     onProgress({ percent: 3, task: '썸네일을 만들고 있어요' })
     await delay(850)
 
@@ -226,6 +242,7 @@ export const renderProject = async (
         context.fillStyle = '#fff'
         context.fillRect(0, 0, canvas.width, canvas.height)
         drawCoveredVideo(context, video, canvas.width, canvas.height)
+        forceFrame()
         await delay(140)
       }
     }
@@ -266,6 +283,7 @@ export const renderProject = async (
           context.fillRect(0, 0, canvas.width, canvas.height)
           drawCoveredVideo(context, video, canvas.width, canvas.height)
           drawClipBubble(context, clip, canvas.width, canvas.height)
+          forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({
             percent: Math.round(5 + ((index + clipProgress) / clips.length) * 92),
@@ -284,7 +302,15 @@ export const renderProject = async (
     await delay(500)
     if (recorder.state === 'recording') {
       recorder.requestData()
-      await delay(180)
+      await Promise.race([chunkReady, delay(1_200)])
+      if (!chunks.length) {
+        context.fillStyle = 'rgba(0,0,0,.001)'
+        context.fillRect(0, 0, 1, 1)
+        forceFrame()
+        await delay(500)
+        recorder.requestData()
+        await delay(500)
+      }
     }
     recorder.stop()
     const blob = await completed

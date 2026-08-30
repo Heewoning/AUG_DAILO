@@ -429,6 +429,8 @@ button { cursor: pointer; }
 .phone-preview video { object-fit: cover; }
 .reference-cover-overlay,
 .reference-scene-overlay { position: absolute; z-index: 3; left: 7%; right: 7%; top: 50%; transform: translateY(-50%); color: #fff; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,.9), 1px 1px 0 #111; pointer-events: none; }
+.reference-cover-overlay { left: 12%; right: 16%; }
+.reference-scene-overlay { left: 10%; right: 15%; }
 .xp-cover-tag,
 .xp-scene-tag { width: max-content; max-width: 100%; min-height: 22px; margin: 0 auto 12px; padding: 3px 4px 3px 7px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.9); border-radius: 5px 5px 2px 2px; color: #fff; background: linear-gradient(#2e86e5,#0749a8); box-shadow: 2px 2px 0 rgba(0,0,0,.28); font: 800 9px/1 Tahoma, "Malgun Gothic", sans-serif; letter-spacing: .02em; text-shadow: 1px 1px #153c73; }
 .xp-cover-tag i,
@@ -453,11 +455,16 @@ button { cursor: pointer; }
 .translation-preview b { display: block; }
 .translation-preview small { color: var(--blue); font: 800 9px/1 Tahoma, sans-serif; }
 .translation-preview b { margin-top: 5px; overflow: hidden; font: 800 13px/1.2 Tahoma, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.reels-safe-guide { position: absolute; z-index: 2; inset: 8% 12% 18% 8%; border: 1px dashed rgba(255,255,255,.5); pointer-events: none; }
+.reels-safe-guide span { position: absolute; left: 5px; top: 5px; padding: 3px 5px; color: rgba(255,255,255,.8); background: rgba(0,0,0,.28); font: 700 7px/1 Tahoma,sans-serif; }
+.mobile-tool-title { display: none; }
 
 @media (max-width: 1099px) {
   .reference-cover-overlay h2 { font-size: clamp(32px,8vw,54px); }
   .reference-scene-overlay time { font-size: clamp(32px,8vw,46px); }
   .reference-scene-overlay strong { font-size: clamp(18px,5vw,26px); }
+  .mobile-tool-title { margin: 0; padding: 13px 17px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #b7aa96; background: #fff9ed; font-size: 13px; font-weight: 900; }
+  .mobile-tool-title small { color: var(--muted); font-size: 10px; font-weight: 600; }
 }
 
 .app-error-screen { min-height: 100vh; padding: 24px; display: grid; place-items: center; background: var(--cream); }
@@ -637,6 +644,9 @@ button { cursor: pointer; }
 .launcher-taskbar span { padding-left: 15px; }.launcher-taskbar time { padding-right: 10px; text-align: right; }
 .launcher-ready { padding: 13px 8px 2px; display: flex; align-items: center; justify-content: space-between; }
 .launcher-ready > span { font-size: 12px; font-weight: 800; }.launcher-ready > span i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: #35a550; }
+.launcher-ready > small { color: var(--muted); font-size: 10px; }
+.section-heading > div small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 600; }
+.thumbnail-grid article > div em { display: block; margin-top: 4px; color: var(--blue); font-size: 8px; font-style: normal; font-weight: 800; }
 .home-mini-steps { max-width: 470px; margin: 30px 0 0; padding: 0; list-style: none; display: flex; align-items: center; gap: 8px; }
 .home-mini-steps li { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .home-mini-steps li:not(:last-child)::after { content: "›"; margin-left: 5px; color: #b7aa98; }

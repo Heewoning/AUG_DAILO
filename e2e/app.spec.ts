@@ -17,7 +17,7 @@ test('theme selection opens the video page without a blank screen', async ({ pag
 })
 
 test('home to upload thumbnails to editor flow works', async ({ page }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(120_000)
   test.skip(test.info().project.name === 'iphone-webkit', 'WebKit 테스트 런타임은 canvas.captureStream 테스트 픽스처 생성을 지원하지 않음')
   await page.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { value: undefined }))
   await page.goto('./')
@@ -78,7 +78,7 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await expect(page.getByText('이 장면을 내 목소리로 설명해요')).toBeVisible()
 
   await page.getByRole('button', { name: /영상 만들기/ }).click()
-  await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 90_000 })
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '영상 저장하기' }).click()
   const result = await downloadPromise

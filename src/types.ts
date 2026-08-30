@@ -60,6 +60,7 @@ export interface DailoClip {
   trimStart: number
   trimEnd: number
   capturedAt: string
+  capturedAtSource?: 'embedded-metadata' | 'file-date'
   displayTime: string
   activity: string
   activityEnglish?: string
