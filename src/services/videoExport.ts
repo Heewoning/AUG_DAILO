@@ -104,7 +104,7 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   if (clip.popup.enabled) {
     const popupWidth = width * 0.56
     const popupX = (width - popupWidth) / 2
-    const popupY = height * 0.28
+    const popupY = height * 0.1
     context.fillStyle = '#fff4c9'
     context.fillRect(popupX, popupY, popupWidth, width * 0.19)
     context.strokeRect(popupX, popupY, popupWidth, width * 0.19)
@@ -158,10 +158,10 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.strokeStyle = 'rgba(24,18,14,.95)'
   context.lineWidth = Math.max(5, width * .009)
   context.textAlign = 'center'
-  const titleSize = Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100))
+  const titleSize = Math.max(Math.round(width * 0.032), Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100)))
   context.font = `900 ${titleSize}px Arial, sans-serif`
-  const titleLines = wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 2)
-  const firstLineY = tagY + width * (titleLines.length > 1 ? .21 : .25)
+  const titleLines = wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 3)
+  const firstLineY = tagY + width * (titleLines.length > 1 ? .19 : .25)
   titleLines.forEach((line, index) => {
     const y = firstLineY + index * titleSize * 1.02
     context.strokeText(line, safeCenterX, y)
@@ -170,8 +170,9 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.font = `600 ${Math.round(width * .03)}px Tahoma, sans-serif`
   const english = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
   const englishY = firstLineY + titleLines.length * titleSize * 1.02 + width * .025
-  context.strokeText(english, safeCenterX, englishY)
-  context.fillText(english, safeCenterX, englishY)
+  const fittedEnglish = fitText(context, english, width * .68)
+  context.strokeText(fittedEnglish, safeCenterX, englishY)
+  context.fillText(fittedEnglish, safeCenterX, englishY)
   context.textAlign = 'start'
 }
 
@@ -189,6 +190,7 @@ export const canRenderVideo = () =>
 export const renderProject = async (
   project: DailoProject,
   onProgress: (progress: ExportProgress) => void,
+  safeMode = false,
 ): Promise<{ blob: Blob; extension: 'mp4' | 'webm' }> => {
   if (!canRenderVideo()) throw new Error('이 기기에서는 영상 합성을 지원하지 않아요. 최신 Safari 또는 Chrome으로 열어주세요.')
   const clips = project.clips.filter((clip) => clip.mediaUrl)
@@ -196,9 +198,9 @@ export const renderProject = async (
 
   const isMobile = window.matchMedia('(max-width: 900px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent)
   const canvas = document.createElement('canvas') as CaptureCanvas
-  canvas.width = 1080
-  canvas.height = 1920
-  const frameRate = isMobile ? 24 : 30
+  canvas.width = safeMode ? 720 : 1080
+  canvas.height = safeMode ? 1280 : 1920
+  const frameRate = safeMode ? 20 : isMobile ? 24 : 30
   const context = canvas.getContext('2d', { alpha: false })
   if (!context) throw new Error('영상 화면을 준비하지 못했어요.')
 
@@ -248,7 +250,7 @@ export const renderProject = async (
   videoSource.connect(videoGain).connect(audioDestination)
   const combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioDestination.stream.getAudioTracks()])
   const mimeType = chooseMimeType()
-  const options = mimeType ? { mimeType, videoBitsPerSecond: isMobile ? 8_000_000 : 10_000_000 } : undefined
+  const options = mimeType ? { mimeType, videoBitsPerSecond: safeMode ? 4_500_000 : isMobile ? 8_000_000 : 10_000_000 } : undefined
   let recorder: MediaRecorder
   try {
     recorder = new MediaRecorder(combinedStream, options)

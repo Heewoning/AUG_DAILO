@@ -216,11 +216,10 @@ function App() {
       let result
       try {
         result = await renderProject(project, setExportState)
-      } catch (error) {
-        if (!(error instanceof Error) || !error.message.includes('비어 있어요')) throw error
-        setExportState({ percent: 2, task: '모바일 렌더링을 한 번 더 연결하고 있어요' })
+      } catch {
+        setExportState({ percent: 2, task: '저장 호환 모드로 영상을 다시 만들고 있어요' })
         await new Promise((resolve) => window.setTimeout(resolve, 350))
-        result = await renderProject(project, setExportState)
+        result = await renderProject(project, setExportState, true)
       }
       const fileDate = new Date().toLocaleDateString('en-CA').replaceAll('-', '')
       setExportedVideo({ blob: result.blob, fileName: `DAY_IN_LIFE_${fileDate}.${result.extension}` })
@@ -322,12 +321,14 @@ function App() {
           onUpdateProject={updateProject}
           onOpenArchive={() => setView('archive')}
           onDeleteClip={removeClip}
+          onRetryMedia={retryThumbnail}
           onExport={exportVideo}
           exportState={exportState}
           exportError={exportError}
           exportReady={Boolean(exportedVideo)}
           onSaveExport={saveExportedVideo}
           onCloseExport={() => { setExportState(undefined); setExportError(undefined); setExportedVideo(undefined) }}
+          exportPreviewUrl={project.exportAsset?.url}
         />
       )}
       {view === 'archive' && <ArchiveScreen projects={projects} selectedProject={archiveProject} onOpen={(id) => void openArchiveProject(id)} onClose={() => setArchiveProject(undefined)} onCreate={startNew} />}

@@ -14,12 +14,14 @@ interface EditorProps {
   onUpdateProject: (patch: Partial<DailoProject>) => void
   onOpenArchive: () => void
   onDeleteClip: (clipId: string) => void
+  onRetryMedia: (clipId: string) => Promise<void>
   onExport: () => Promise<void>
   exportState?: { percent: number; task: string }
   exportError?: string
   exportReady: boolean
   onSaveExport: () => Promise<void>
   onCloseExport: () => void
+  exportPreviewUrl?: string
 }
 
 const tabs: EditorTab[] = ['COVER', 'CLIP', 'TEXT', 'TRANSITION', 'POPUP']
@@ -29,13 +31,14 @@ const tabLabels: Record<EditorTab, string> = {
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 
 export const EditorScreen = ({
-  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onExport, exportState, exportError,
-  exportReady, onSaveExport, onCloseExport, onUpdateProject, onOpenArchive,
+  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onRetryMedia, onExport, exportState, exportError,
+  exportReady, onSaveExport, onCloseExport, exportPreviewUrl, onUpdateProject, onOpenArchive,
 }: EditorProps) => {
   const [tab, setTab] = useState<EditorTab>('COVER')
   const [showAssistant, setShowAssistant] = useState(false)
   const [previewAll, setPreviewAll] = useState(false)
   const [previewIndex, setPreviewIndex] = useState(0)
+  const [previewFailed, setPreviewFailed] = useState(false)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedClipId) ?? project.clips[0],
@@ -84,12 +87,16 @@ export const EditorScreen = ({
     if (!previewAll) return
     if (previewIndex < project.clips.length - 1) {
       const next = previewIndex + 1
+      setPreviewFailed(false)
       setPreviewIndex(next)
       onSelect(project.clips[next].id)
     } else setPreviewAll(false)
   }
 
   const startPreview = () => {
+    const video = previewVideoRef.current
+    if (video) void video.play().catch(() => undefined)
+    setPreviewFailed(false)
     setTab('CLIP')
     setPreviewIndex(0)
     setPreviewAll(true)
@@ -97,7 +104,7 @@ export const EditorScreen = ({
   }
 
   return (
-    <main className="editor-screen">
+    <main className={`editor-screen ${tab === 'COVER' ? 'editor-screen--cover' : ''}`}>
       <header className="editor-header">
         <div className="editor-title"><span className="mini-logo">D</span><div><b>{project.title}</b><small>{project.customTheme || project.mode} · {project.clips.length} CLIPS</small></div></div>
         <span className={`save-state ${saving ? 'saving' : ''}`}><i />{saving ? 'SAVING...' : 'SAVED'}</span>
@@ -120,7 +127,7 @@ export const EditorScreen = ({
           <div className="clip-sidebar__list">
             {project.clips.map((clip, index) => (
               <article key={clip.id} className={`clip-sidebar-card ${clip.id === selected.id ? 'active' : ''}`}>
-                <button className="clip-sidebar-card__select" onClick={() => { setPreviewAll(false); onSelect(clip.id) }}>
+                <button className="clip-sidebar-card__select" onClick={() => { setPreviewAll(false); setPreviewFailed(false); onSelect(clip.id) }}>
                   <em>{String(index + 1).padStart(2, '0')}</em>
                   {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <i>VIDEO</i>}
                   <span><b>{clip.displayTime}</b><small>{clip.name}</small></span>
@@ -137,14 +144,15 @@ export const EditorScreen = ({
         <section className="preview-column">
           <div className="preview-label"><span>실시간 미리보기 · 9:16</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
           <div className="phone-preview">
-            <video ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} src={activePreviewClip.mediaUrl} controls playsInline preload="metadata" onEnded={advancePreview} onTimeUpdate={(event) => { if (previewAll && event.currentTarget.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />
+            {!previewFailed && <video ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} src={activePreviewClip.mediaUrl} poster={activePreviewClip.thumbnail || undefined} controls playsInline preload="metadata" onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(event) => { if (previewAll && event.currentTarget.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+            {previewFailed && <button className="media-retry media-retry--preview editor-media-retry" onClick={() => { setPreviewFailed(false); void onRetryMedia(activePreviewClip.id) }}><b>미리보기를 불러오지 못했어요</b><span>↻ 영상 다시 연결하기</span></button>}
             <div className="video-gradient" />
             {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
             {tab === 'COVER' ? (
               <div className="reference-cover-overlay">
                 <span className="xp-cover-tag"><i>{previewPresentation.icon}</i> DAY_IN_LIFE.EXE <b>×</b></span>
                 <small>{project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY'}</small>
-                <h2 style={{ fontSize: `${Math.max(25, 42 * ((project.coverFontScale ?? 100) / 100))}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
+                <h2 style={{ fontSize: `${Math.max(14, 42 * ((project.coverFontScale ?? 100) / 100))}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
                 <p>{coverEnglish}</p>
               </div>
             ) : (
@@ -177,7 +185,7 @@ export const EditorScreen = ({
             <div className="inspector-panel cover-panel">
               <div className="panel-guide"><i>1</i><p><b>영상의 첫 화면을 골라요</b><br />선택한 사진 뒤에 빠른 장면들이 이어집니다.</p></div>
               <label>썸네일 제목<textarea rows={2} value={project.coverTitle} maxLength={40} placeholder={'예: 서진이의 하루\nDAY VLOG'} onChange={(event) => onUpdateProject({ coverTitle: event.target.value })} /><small className="field-help">Enter를 누르면 원하는 위치에서 줄을 바꿀 수 있어요.</small></label>
-              <label>제목 글자 크기 <span>{project.coverFontScale ?? 100}%</span><input type="range" min="70" max="115" step="5" value={project.coverFontScale ?? 100} onChange={(event) => onUpdateProject({ coverFontScale: Number(event.target.value) })} /></label>
+              <label>제목 글자 크기 <span>{project.coverFontScale ?? 100}%</span><input type="range" min="35" max="115" step="5" value={project.coverFontScale ?? 100} onChange={(event) => onUpdateProject({ coverFontScale: Number(event.target.value) })} /></label>
               <p className="suggestion-label">대표 장면 선택</p>
               <div className="cover-choices">
                 {project.clips.map((clip, index) => <button key={clip.id} className={(project.coverClipId ?? project.clips[0]?.id) === clip.id ? 'active' : ''} onClick={() => { onUpdateProject({ coverClipId: clip.id }); onSelect(clip.id) }}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 썸네일`} /> : <span>VIDEO</span>}<i>{index + 1}</i></button>)}
@@ -260,6 +268,7 @@ export const EditorScreen = ({
             <p>{exportError ?? exportState?.task}</p>
             {!exportError && <ProgressBar value={exportState?.percent ?? 0} />}
             {!exportError && <small>{exportState?.percent ?? 0}% · 브라우저를 닫지 마세요.</small>}
+            {exportReady && exportPreviewUrl && <video className="export-result-preview" src={exportPreviewUrl} controls playsInline preload="metadata" />}
             {exportReady && <RetroButton className="save-export-button" onClick={() => void onSaveExport()}>영상 저장하기</RetroButton>}
             {exportReady && <p className="save-help">PC·지원 기기에서는 DAILO 폴더를 만들 수 있어요.<br />iPhone은 공유 메뉴에서 ‘비디오 저장’을 선택해 주세요.</p>}
             {(exportError || exportReady) && <button className="plain-close" onClick={onCloseExport}>닫기</button>}

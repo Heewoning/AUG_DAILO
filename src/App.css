@@ -803,3 +803,89 @@ button { cursor: pointer; }
   .translation-editor > i { align-self: center; }
   .translation-editor > button { width: 100%; }
 }
+
+/* Compact mobile production flow: preview and the active tool stay together. */
+.export-result-preview { width: min(180px, 52vw); max-height: 260px; margin: 14px auto 0; display: block; aspect-ratio: 9/16; object-fit: contain; border: 1px solid #715f4d; background: #111; }
+.editor-media-retry { position: absolute; z-index: 12; inset: 0; }
+.compact-video-popup { top: 5%; left: 12%; right: 12%; }
+.reference-cover-overlay h2 { max-width: 96%; word-break: keep-all; overflow-wrap: break-word; }
+
+@media (max-width: 600px) {
+  .create-quest--upload { width: calc(100% - 18px); padding-bottom: 78px; }
+  .create-quest--upload .quest-steps { height: 40px; margin: 6px 0 8px; }
+  .create-quest--upload .quest-steps::before { top: 12px; }
+  .create-quest--upload .quest-steps > span { display: flex; justify-content: center; gap: 4px; font-size: 9px; }
+  .create-quest--upload .quest-steps i { width: 25px; height: 25px; border-width: 1px; font-size: 9px; }
+  .create-quest--upload .quest-heading { margin-bottom: 10px; }
+  .create-quest--upload .quest-heading h1 { margin: 5px 0; font-size: 30px; line-height: 1.02; }
+  .create-quest--upload .back-step { min-height: 30px; padding-block: 4px; }
+  .create-quest--upload .upload-window .retro-window__body { padding: 5px; }
+  .create-quest--upload .compact-drop-zone { min-height: 170px; padding: 12px; gap: 8px; }
+  .create-quest--upload .compact-drop-zone .upload-glyph { width: 43px; height: 43px; font-size: 22px; }
+  .create-quest--upload .compact-drop-zone h2 { font-size: 15px; }
+  .create-quest--upload .compact-drop-zone p { font-size: 10px; line-height: 1.4; }
+  .upload-step--ready .quest-heading { display: none; }
+  .upload-step--ready .upload-window .retro-titlebar { display: none; }
+  .upload-step--ready .compact-drop-zone { min-height: 44px; height: 44px; padding: 4px 6px; display: flex; justify-content: space-between; }
+  .upload-step--ready .compact-drop-zone .upload-glyph,
+  .upload-step--ready .compact-drop-zone > div { display: none; }
+  .upload-step--ready .compact-drop-zone .retro-button { width: 100%; min-height: 34px; }
+  .upload-step--ready .quest-review { margin-top: 6px; padding: 7px; }
+  .upload-step--ready .section-heading { min-height: 32px; margin-bottom: 6px; }
+  .upload-step--ready .section-heading h2 { font-size: 13px; }
+  .upload-step--ready .section-heading small { font-size: 8px; }
+  .upload-step--ready .clip-review__content { gap: 7px; }
+  .upload-step--ready .upload-preview { width: 100%; height: 210px; aspect-ratio: auto; }
+  .upload-step--ready .upload-preview video { object-fit: contain; }
+  .upload-step--ready .thumbnail-grid { max-height: 104px; padding: 1px 2px 3px; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+  .upload-step--ready .thumbnail-grid article { width: 82px; min-width: 82px; height: 96px; padding: 3px; }
+  .upload-step--ready .thumbnail-grid article.selected { padding: 2px; }
+  .upload-step--ready .thumbnail-card { height: 70px; }
+  .upload-step--ready .thumbnail-grid article > div { margin-top: 3px; }
+  .upload-step--ready .thumbnail-grid article > div b,
+  .upload-step--ready .thumbnail-grid article > div em { display: none; }
+  .upload-step--ready .thumbnail-grid article > div small { margin-top: 0; font-size: 8px; }
+  .upload-step--ready .thumbnail-grid article > nav { display: none; }
+  .upload-step--ready .media-retry { min-height: 24px; margin-top: 2px; padding: 2px; font-size: 8px; }
+  .upload-step--ready .create-footer { margin-top: 7px; padding-top: 7px; display: grid; grid-template-columns: 1fr 1.15fr; gap: 7px; }
+  .upload-step--ready .create-footer p { gap: 5px; }
+  .upload-step--ready .create-footer p i { width: 24px; height: 24px; }
+  .upload-step--ready .create-footer p b { font-size: 10px; }
+  .upload-step--ready .create-footer p small { display: none; }
+  .upload-step--ready .create-footer .primary-cta { min-height: 42px; font-size: 12px; }
+
+  .app-shell--editor .preview-column { order: 1; }
+  .app-shell--editor .inspector { order: 2; }
+  .app-shell--editor .clip-sidebar { order: 3; }
+  .app-shell--editor .mobile-tool-title { display: none; }
+  .app-shell--editor .tool-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .app-shell--editor .tool-tabs button { min-height: 43px; padding-inline: 2px; font-size: 10px; }
+  .app-shell--editor .inspector-panel { padding-top: 12px; }
+  .app-shell--editor .translation-editor input { min-height: 40px; }
+  .compact-video-popup { top: 4%; left: 10%; right: 10%; }
+  .compact-video-popup .retro-titlebar { height: 19px; }
+  .compact-video-popup .retro-window__body { min-height: 34px; padding: 5px; }
+  .reference-scene-overlay { top: 53%; }
+  .manual-video-caption { bottom: 5%; }
+
+  .app-shell:has(.editor-screen--cover) { height: 100svh; min-height: 0; overflow: hidden; }
+  .app-shell:has(.editor-screen--cover) .bottom-nav { display: none; }
+  .editor-screen--cover { height: 100svh; overflow: hidden; }
+  .editor-screen--cover .clip-sidebar { display: none; }
+  .editor-screen--cover .preview-column { height: 230px; padding: 5px; }
+  .editor-screen--cover .preview-label { min-height: 28px; }
+  .editor-screen--cover .preview-meta { display: none; }
+  .editor-screen--cover .inspector { min-height: 0; }
+  .editor-screen--cover .tool-tabs { height: 42px; }
+  .editor-screen--cover .tool-tabs button { min-height: 42px; }
+  .editor-screen--cover .cover-panel { padding: 8px 12px 6px; }
+  .editor-screen--cover .cover-panel .panel-guide { display: none; }
+  .editor-screen--cover .cover-panel > label { margin-bottom: 5px; }
+  .editor-screen--cover .cover-panel textarea { min-height: 39px; height: 39px; margin-top: 3px; padding: 5px 7px; }
+  .editor-screen--cover .cover-panel input[type="range"] { margin-top: 3px; }
+  .editor-screen--cover .suggestion-label { margin: 3px 0; }
+  .editor-screen--cover .cover-choices { height: 61px; margin: 2px 0 5px; display: flex; gap: 5px; overflow-x: auto; }
+  .editor-screen--cover .cover-choices button { width: 38px; min-width: 38px; height: 58px; aspect-ratio: auto; }
+  .editor-screen--cover .toggle-field { min-height: 38px; margin: 0; padding: 5px 7px; }
+  .editor-screen--cover .toggle-field small { font-size: 8px; }
+}

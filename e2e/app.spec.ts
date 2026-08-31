@@ -68,6 +68,7 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await expect(page.getByText('USER VOICE ONLY')).toHaveCount(0)
   await expect(page.locator('.reference-cover-overlay')).toBeVisible()
   const timeInput = page.getByLabel('1번 클립 시간')
+  if (!(await timeInput.isVisible())) await page.getByRole('button', { name: '장면', exact: true }).click()
   await expect(timeInput).toBeVisible()
   expect(await timeInput.inputValue()).toMatch(/^\d{2}:\d{2}$/)
   await page.getByLabel('1번 클립 문구').fill('다이소 출근')
@@ -80,6 +81,7 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
 
   await page.getByRole('button', { name: /영상 만들기/ }).click()
   await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 90_000 })
+  await expect(page.locator('.export-result-preview')).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '영상 저장하기' }).click()
   const result = await downloadPromise

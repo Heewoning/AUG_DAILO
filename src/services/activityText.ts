@@ -26,6 +26,8 @@ const exactTranslations: Record<string, Presentation> = {
   '오늘의 하루': { english: 'A day in my life', icon: '💿' },
   '머리핀을 꽂았어요': { english: 'I put on a hair clip', icon: '🎀' },
   '머리핀 꽂았어요': { english: 'I put on a hair clip', icon: '🎀' },
+  '머리핀이 너무 좋아요': { english: 'I really love my hair clip', icon: '🎀' },
+  '머리핀이 좋아요': { english: 'I love my hair clip', icon: '🎀' },
   '머리를 묶었어요': { english: 'I tied my hair', icon: '🎀' },
   '옷을 입었어요': { english: 'I got dressed', icon: '👗' },
   '양치했어요': { english: 'I brushed my teeth', icon: '🪥' },
@@ -75,7 +77,7 @@ const translateLocation = (value: string) => locations[value.trim()] ?? nameInEn
 
 const iconRules: Array<{ pattern: RegExp; icon: string }> = [
   { pattern: /머리|핀|화장|옷|신발/, icon: '🎀' },
-  { pattern: /아이|친구|함께|놀|이랑|의 하루/, icon: '💗' },
+  { pattern: /아이|친구|함께|놀|이랑|의 하루|춤추는|춤춰/, icon: '💗' },
   { pattern: /출근|회사|오피스/, icon: '💼' },
   { pattern: /카페|커피|라떼/, icon: '☕' },
   { pattern: /아침|기상|일어나/, icon: '☀️' },
@@ -90,6 +92,20 @@ const iconRules: Array<{ pattern: RegExp; icon: string }> = [
 const sentenceTranslation = (text: string): string | undefined => {
   let match = text.match(/^(.+?)(?:이랑|랑|와|과)\s*함께$/)
   if (match) return `With ${nameInEnglish(match[1])}`
+
+  match = text.match(/^춤추는\s*(.+?)이?$/)
+  if (match) return `${nameInEnglish(match[1])} is dancing`
+
+  match = text.match(/^(.+?)(?:이|가)\s*(?:춤춰요|춤췄어요|춤추고 있어요)$/)
+  if (match) return `${nameInEnglish(match[1])} is dancing`
+
+  match = text.match(/^(.+?)(?:이|가)\s*너무\s*(좋아요|예뻐요|귀여워요)$/)
+  if (match) {
+    const object = translateNoun(match[1])
+    if (match[2] === '예뻐요') return `${object.replace(/^a /, 'The ')} looks so pretty`
+    if (match[2] === '귀여워요') return `${object.replace(/^a /, 'The ')} is so cute`
+    return `I really love ${object}`
+  }
 
   match = text.match(/^(.+?)(?:이랑|랑|와|과)\s*(?:놀았어요|놀았어|놀기)$/)
   if (match) return `I had fun with ${nameInEnglish(match[1])}`

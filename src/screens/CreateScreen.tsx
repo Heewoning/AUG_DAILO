@@ -69,7 +69,7 @@ export const CreateScreen = ({
   }
 
   return (
-    <main className={`screen create-screen create-quest ${step === 1 ? 'create-quest--theme' : ''}`}>
+    <main className={`screen create-screen create-quest ${step === 1 ? 'create-quest--theme' : 'create-quest--upload'}`}>
       <nav className="quest-steps" aria-label="영상 만들기 단계">
         {steps.map((label, index) => {
           const number = index + 1
@@ -108,7 +108,7 @@ export const CreateScreen = ({
           </div>
         </section>
       ) : (
-        <section className="upload-step">
+        <section className={`upload-step ${project.clips.length ? 'upload-step--ready' : ''}`}>
           <header className="quest-heading quest-heading--row">
             <div><span>STEP 02</span><h1>오늘 찍은 영상을<br />골라 주세요.</h1></div>
             <button className="back-step" onClick={() => setStep(1)}>← 테마 다시 고르기</button>
@@ -136,7 +136,7 @@ export const CreateScreen = ({
               </div>
               <div className="clip-review__content">
                 <div className="upload-preview">
-                  {selected?.mediaUrl && !previewFailed && <video key={selected.id} src={selected.mediaUrl} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} onError={() => setPreviewFailed(true)} />}
+                  {selected?.mediaUrl && !previewFailed && <video key={selected.id} src={selected.mediaUrl} poster={selected.thumbnail || undefined} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} onError={() => setPreviewFailed(true)} />}
                   {selected && previewFailed && <button className="media-retry media-retry--preview" onClick={() => void retryThumbnail(selected.id)}><b>영상을 표시하지 못했어요</b><span>↻ 다시 불러오기</span></button>}
                   <span>{selected?.displayTime}</span><b>{selected?.activity || '장면 문구는 다음 단계에서 적어요'}</b>
                 </div>
