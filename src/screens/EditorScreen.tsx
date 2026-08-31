@@ -14,7 +14,7 @@ interface EditorProps {
   onUpdateProject: (patch: Partial<DailoProject>) => void
   onOpenArchive: () => void
   onDeleteClip: (clipId: string) => void
-  onRetryMedia: (clipId: string) => Promise<void>
+  onReplaceMedia: (clipId: string, file: File) => Promise<void>
   onExport: () => Promise<void>
   exportState?: { percent: number; task: string }
   exportError?: string
@@ -31,13 +31,14 @@ const tabLabels: Record<EditorTab, string> = {
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 
 export const EditorScreen = ({
-  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onRetryMedia, onExport, exportState, exportError,
+  project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onReplaceMedia, onExport, exportState, exportError,
   exportReady, onSaveExport, onCloseExport, exportPreviewUrl, onUpdateProject, onOpenArchive,
 }: EditorProps) => {
   const [tab, setTab] = useState<EditorTab>('COVER')
   const [showAssistant, setShowAssistant] = useState(false)
   const [previewAll, setPreviewAll] = useState(false)
   const [previewIndex, setPreviewIndex] = useState(0)
+  const [coverMontageIndex, setCoverMontageIndex] = useState(0)
   const [previewFailed, setPreviewFailed] = useState(false)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const selected = useMemo(
@@ -58,6 +59,12 @@ export const EditorScreen = ({
     return () => video.removeEventListener('loadedmetadata', play)
   }, [previewAll, previewIndex, project.clips])
 
+  useEffect(() => {
+    if (tab !== 'COVER' || project.clips.length < 2) return
+    const timer = window.setInterval(() => setCoverMontageIndex((index) => (index + 1) % project.clips.length), 200)
+    return () => window.clearInterval(timer)
+  }, [project.clips.length, tab])
+
   if (!selected) return <main className="screen"><p>편집할 클립이 없습니다.</p></main>
 
   const updatePopup = (patch: Partial<DailoClip['popup']>) =>
@@ -66,6 +73,14 @@ export const EditorScreen = ({
   const updateActivity = (clip: DailoClip, activity: string) => {
     const presentation = activityTextProvider.present(activity)
     onUpdateClip(clip.id, { activity, activityEnglish: presentation.english, activityEnglishEdited: false, activityIcon: presentation.icon })
+  }
+
+  const replaceMedia = async (input: HTMLInputElement) => {
+    const file = input.files?.[0]
+    if (!file) return
+    setPreviewFailed(false)
+    await onReplaceMedia(activePreviewClip.id, file)
+    input.value = ''
   }
 
   const presentationFor = (clip: DailoClip) => {
@@ -77,11 +92,13 @@ export const EditorScreen = ({
   }
 
   const selectedPresentation = presentationFor(selected)
-  const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
-  const previewClip = tab === 'COVER' ? coverClip : selected
+  const previewClip = tab === 'COVER' ? project.clips[coverMontageIndex % project.clips.length] ?? project.clips[0] : selected
   const activePreviewClip = previewAll ? project.clips[previewIndex] ?? selected : previewClip
   const previewPresentation = presentationFor(activePreviewClip)
   const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
+  const coverTitleLength = Array.from(project.coverTitle.replace(/\s/g, '')).length || 1
+  const requestedCoverSize = 42 * ((project.coverFontScale ?? 100) / 100)
+  const fittedCoverSize = Math.max(10, Math.min(requestedCoverSize, requestedCoverSize * Math.min(1, 24 / coverTitleLength)))
 
   const advancePreview = () => {
     if (!previewAll) return
@@ -116,7 +133,7 @@ export const EditorScreen = ({
       </header>
 
       <nav className="editor-quest-bar" aria-label="꾸미기 진행 단계">
-        <span className={project.coverClipId ? 'done' : 'active'}><i>{project.coverClipId ? '✓' : '1'}</i>썸네일</span>
+        <span className={project.coverTitle.trim() ? 'done' : 'active'}><i>{project.coverTitle.trim() ? '✓' : '1'}</i>썸네일</span>
         <span className={project.clips.some((clip) => clip.activity) ? 'done' : ''}><i>2</i>장면 꾸미기</span>
         <span><i>3</i>영상 저장</span>
       </nav>
@@ -144,15 +161,15 @@ export const EditorScreen = ({
         <section className="preview-column">
           <div className="preview-label"><span>실시간 미리보기 · 9:16</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
           <div className="phone-preview">
-            {!previewFailed && <video ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} src={activePreviewClip.mediaUrl} poster={activePreviewClip.thumbnail || undefined} controls playsInline preload="metadata" onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(event) => { if (previewAll && event.currentTarget.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
-            {previewFailed && <button className="media-retry media-retry--preview editor-media-retry" onClick={() => { setPreviewFailed(false); void onRetryMedia(activePreviewClip.id) }}><b>미리보기를 불러오지 못했어요</b><span>↻ 영상 다시 연결하기</span></button>}
+            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && <video ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} src={activePreviewClip.mediaUrl} poster={activePreviewClip.thumbnail || undefined} controls playsInline preload="metadata" onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(event) => { if (previewAll && event.currentTarget.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+            {previewFailed && <div className="media-recovery-panel editor-media-retry"><b>이 영상의 원본이 필요해요</b><p>원본을 다시 골라도 문구와 자막은 그대로 유지됩니다.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>이 클립 삭제</button></div>}
             <div className="video-gradient" />
             {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
             {tab === 'COVER' ? (
               <div className="reference-cover-overlay">
                 <span className="xp-cover-tag"><i>{previewPresentation.icon}</i> DAY_IN_LIFE.EXE <b>×</b></span>
                 <small>{project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY'}</small>
-                <h2 style={{ fontSize: `${Math.max(14, 42 * ((project.coverFontScale ?? 100) / 100))}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
+                <h2 style={{ fontSize: `${fittedCoverSize}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
                 <p>{coverEnglish}</p>
               </div>
             ) : (
@@ -178,7 +195,7 @@ export const EditorScreen = ({
           <header><span>CLIP_{String(project.clips.indexOf(selected) + 1).padStart(2, '0')}.MOV</span><button>×</button></header>
           <p className="mobile-tool-title">편집 도구 <small>아래 메뉴를 눌러 바로 수정하세요.</small></p>
           <nav className="tool-tabs" aria-label="편집 도구">
-            {tabs.map((item) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{tabLabels[item]}</button>)}
+            {tabs.map((item) => <button key={item} className={tab === item ? 'active' : ''} onClick={() => { setPreviewFailed(false); setTab(item) }}>{tabLabels[item]}</button>)}
           </nav>
 
           {tab === 'COVER' && (
@@ -186,19 +203,19 @@ export const EditorScreen = ({
               <div className="panel-guide"><i>1</i><p><b>영상의 첫 화면을 골라요</b><br />선택한 사진 뒤에 빠른 장면들이 이어집니다.</p></div>
               <label>썸네일 제목<textarea rows={2} value={project.coverTitle} maxLength={40} placeholder={'예: 서진이의 하루\nDAY VLOG'} onChange={(event) => onUpdateProject({ coverTitle: event.target.value })} /><small className="field-help">Enter를 누르면 원하는 위치에서 줄을 바꿀 수 있어요.</small></label>
               <label>제목 글자 크기 <span>{project.coverFontScale ?? 100}%</span><input type="range" min="35" max="115" step="5" value={project.coverFontScale ?? 100} onChange={(event) => onUpdateProject({ coverFontScale: Number(event.target.value) })} /></label>
-              <p className="suggestion-label">대표 장면 선택</p>
-              <div className="cover-choices">
-                {project.clips.map((clip, index) => <button key={clip.id} className={(project.coverClipId ?? project.clips[0]?.id) === clip.id ? 'active' : ''} onClick={() => { onUpdateProject({ coverClipId: clip.id }); onSelect(clip.id) }}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 썸네일`} /> : <span>VIDEO</span>}<i>{index + 1}</i></button>)}
+              <p className="suggestion-label">0.2초 커버 슬라이드 · 전체 장면 자동 포함</p>
+              <div className="cover-montage-strip">
+                {project.clips.map((clip, index) => <span key={clip.id} className={coverMontageIndex === index ? 'active' : ''}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 커버 장면`} /> : <i>VIDEO</i>}<b>{index + 1}</b></span>)}
               </div>
-              <label className="toggle-field"><span>0.2초 전체 컷 오프닝<small>썸네일 다음에 모든 장면이 0.2초씩 재생돼요.</small></span><input type="checkbox" checked={project.fastIntro} onChange={(event) => onUpdateProject({ fastIntro: event.target.checked })} /></label>
+              <div className="cover-montage-status"><i>✓</i><span><b>모든 장면이 커버에 들어가요</b><small>각 장면이 0.2초씩 순서대로 반복됩니다.</small></span></div>
             </div>
           )}
 
           {tab === 'CLIP' && (
             <div className="inspector-panel">
-              <label>촬영 시간 <span>AUTO</span><input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /><small className="field-help">영상 선택 시 촬영 정보와 자동 연동돼요.</small></label>
-              <label>장면 문구<input value={selected.activity} placeholder="예: 다이소 출근" onChange={(event) => updateActivity(selected, event.target.value)} /></label>
-              <div className="translation-preview translation-editor"><i>{selectedPresentation.icon}</i><label><small>ENGLISH · 자동 번역 후 직접 수정 가능</small><input value={selectedPresentation.english} onChange={(event) => onUpdateClip(selected.id, { activityEnglish: event.target.value, activityEnglishEdited: true })} /></label>{selected.activityEnglishEdited && <button onClick={() => onUpdateClip(selected.id, { activityEnglish: activityTextProvider.present(selected.activity).english, activityEnglishEdited: false })}>자동 번역</button>}</div>
+              <label>촬영 시간 <span>AUTO</span><input aria-label="선택한 클립 시간" value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /><small className="field-help">영상 선택 시 촬영 정보와 자동 연동돼요.</small></label>
+              <label>장면 문구<input aria-label="선택한 클립 문구" value={selected.activity} placeholder="예: 다이소 출근" onChange={(event) => updateActivity(selected, event.target.value)} /></label>
+              <div className="translation-preview translation-editor"><i>{selectedPresentation.icon}</i><label><small>ENGLISH · 자동 번역 후 직접 수정 가능</small><input aria-label="영어 자막" value={selectedPresentation.english} onChange={(event) => onUpdateClip(selected.id, { activityEnglish: event.target.value, activityEnglishEdited: true })} /></label>{selected.activityEnglishEdited && <button onClick={() => onUpdateClip(selected.id, { activityEnglish: activityTextProvider.present(selected.activity).english, activityEnglishEdited: false })}>자동 번역</button>}</div>
               <details className="advanced-tools">
                 <summary>상세 편집 열기</summary>
                 <div className="field-row"><label>시작 위치<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>끝 위치<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>

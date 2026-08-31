@@ -13,20 +13,19 @@ interface CreateProps {
   onFiles: (files: File[]) => Promise<void>
   onRemove: (clipId: string) => void
   onMove: (clipId: string, direction: -1 | 1) => void
-  onRetryThumbnail: (clipId: string) => Promise<void>
+  onReplace: (clipId: string, file: File) => Promise<void>
   onAnalyze: () => Promise<void>
 }
 
 const steps = ['테마 고르기', '영상 고르기', '꾸미고 저장']
 
 export const CreateScreen = ({
-  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onRetryThumbnail, onAnalyze,
+  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onReplace, onAnalyze,
 }: CreateProps) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<1 | 2>(project.clips.length ? 2 : 1)
   const [chosenMode, setChosenMode] = useState<ProjectMode>()
   const [selectedId, setSelectedId] = useState<string>()
-  const [retryingId, setRetryingId] = useState<string>()
   const [previewFailed, setPreviewFailed] = useState(false)
   const [dragging, setDragging] = useState(false)
   const selected = useMemo(
@@ -58,14 +57,12 @@ export const CreateScreen = ({
     setStep(2)
   }
 
-  const retryThumbnail = async (clipId: string) => {
-    setRetryingId(clipId)
+  const replaceSource = async (clipId: string, input: HTMLInputElement) => {
+    const file = input.files?.[0]
+    if (!file) return
     setPreviewFailed(false)
-    try {
-      await onRetryThumbnail(clipId)
-    } finally {
-      setRetryingId(undefined)
-    }
+    await onReplace(clipId, file)
+    input.value = ''
   }
 
   return (
@@ -137,7 +134,7 @@ export const CreateScreen = ({
               <div className="clip-review__content">
                 <div className="upload-preview">
                   {selected?.mediaUrl && !previewFailed && <video key={selected.id} src={selected.mediaUrl} poster={selected.thumbnail || undefined} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} onError={() => setPreviewFailed(true)} />}
-                  {selected && previewFailed && <button className="media-retry media-retry--preview" onClick={() => void retryThumbnail(selected.id)}><b>영상을 표시하지 못했어요</b><span>↻ 다시 불러오기</span></button>}
+                  {selected && previewFailed && <div className="media-recovery-panel"><b>이 원본을 읽지 못했어요</b><p>같은 영상 파일을 다시 선택하면 작성한 내용은 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceSource(selected.id, event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onRemove(selected.id) }}>이 클립 삭제</button></div>}
                   <span>{selected?.displayTime}</span><b>{selected?.activity || '장면 문구는 다음 단계에서 적어요'}</b>
                 </div>
                 <div className="thumbnail-grid" aria-label="업로드한 영상 목록">
@@ -147,7 +144,7 @@ export const CreateScreen = ({
                         {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <span className="thumbnail-loading">미리보기를 불러오지 못했어요</span>}
                         <i>{String(index + 1).padStart(2, '0')}</i><em>▶</em>
                       </button>
-                      {!clip.thumbnail && <button className="media-retry" disabled={retryingId === clip.id} onClick={() => void retryThumbnail(clip.id)}>{retryingId === clip.id ? '불러오는 중…' : '↻ 다시 불러오기'}</button>}
+                      {!clip.thumbnail && <div className="media-recovery-actions"><label>원본 선택<input type="file" accept="video/*" onChange={(event) => void replaceSource(clip.id, event.currentTarget)} /></label><button onClick={() => onRemove(clip.id)}>삭제</button></div>}
                       <div><b>{clip.name}</b><small>{clip.displayTime} 촬영 · {formatDuration(clip.duration)}</small><em>{clip.capturedAtSource === 'embedded-metadata' ? '원본 촬영정보' : '파일 날짜 기준'}</em></div>
                       <nav aria-label={`${clip.name} 순서 조절`}>
                         <button onClick={() => onMove(clip.id, -1)} disabled={index === 0}>←</button>

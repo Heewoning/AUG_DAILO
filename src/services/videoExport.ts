@@ -91,14 +91,21 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.font = `300 ${Math.round(width * 0.085)}px Tahoma, Arial, sans-serif`
   context.strokeText(clip.displayTime, width / 2, centerY)
   context.fillText(clip.displayTime, width / 2, centerY)
-  context.font = `800 ${Math.round(width * 0.055)}px Arial, sans-serif`
-  const korean = fitText(context, clip.activity || '이 장면의 문구를 입력해 주세요', width * .82)
-  context.strokeText(korean, width / 2, centerY + width * .075)
-  context.fillText(korean, width / 2, centerY + width * .075)
-  context.font = `500 ${Math.round(width * 0.03)}px Tahoma, Arial, sans-serif`
+  const koreanSize = Math.round(width * 0.055)
+  context.font = `800 ${koreanSize}px Arial, sans-serif`
+  const koreanLines = wrapText(context, clip.activity || '이 장면의 문구를 입력해 주세요', width * .82, 2)
+  const koreanStartY = centerY + width * .072
+  koreanLines.forEach((line, index) => {
+    const lineY = koreanStartY + index * koreanSize * .96
+    context.strokeText(line, width / 2, lineY)
+    context.fillText(line, width / 2, lineY)
+  })
+  const englishSize = Math.round(width * 0.03)
+  context.font = `500 ${englishSize}px Tahoma, Arial, sans-serif`
   const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish || presentation.english : presentation.english, width * .78)
-  context.strokeText(english, width / 2, centerY + width * .125)
-  context.fillText(english, width / 2, centerY + width * .125)
+  const englishY = koreanStartY + koreanLines.length * koreanSize * .96 + englishSize * .45
+  context.strokeText(english, width / 2, englishY)
+  context.fillText(english, width / 2, englishY)
   context.textAlign = 'start'
 
   if (clip.popup.enabled) {
@@ -120,12 +127,16 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
 
   if (clip.caption) {
     const captionWidth = width * 0.78
+    const captionSize = Math.round(width * 0.031)
+    context.font = `600 ${captionSize}px Arial, sans-serif`
+    const captionLines = wrapText(context, clip.caption, captionWidth - width * 0.06, 2)
+    const captionHeight = width * (captionLines.length > 1 ? .13 : .09)
+    const captionTop = height * .855
     context.fillStyle = 'rgba(18, 15, 13, .7)'
-    context.fillRect((width - captionWidth) / 2, height * 0.86, captionWidth, width * 0.09)
+    context.fillRect((width - captionWidth) / 2, captionTop, captionWidth, captionHeight)
     context.fillStyle = '#fff'
-    context.font = `600 ${Math.round(width * 0.031)}px Arial, sans-serif`
     context.textAlign = 'center'
-    context.fillText(fitText(context, clip.caption, captionWidth - width * 0.06), width / 2, height * 0.916)
+    captionLines.forEach((line, index) => context.fillText(line, width / 2, captionTop + captionSize * (1.45 + index * 1.15)))
     context.textAlign = 'start'
   }
 }
@@ -136,7 +147,7 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   gradient.addColorStop(1, 'rgba(0,0,0,.45)')
   context.fillStyle = gradient
   context.fillRect(0, 0, width, height)
-  const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
+  const coverClip = project.clips[0]
   const presentation = activityTextProvider.present(coverClip?.activity ?? '')
   const safeCenterX = width * .46
   const tagWidth = width * .48
@@ -158,8 +169,13 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.strokeStyle = 'rgba(24,18,14,.95)'
   context.lineWidth = Math.max(5, width * .009)
   context.textAlign = 'center'
-  const titleSize = Math.max(Math.round(width * 0.032), Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100)))
+  const minimumTitleSize = Math.round(width * 0.02)
+  let titleSize = Math.max(minimumTitleSize, Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100)))
   context.font = `900 ${titleSize}px Arial, sans-serif`
+  while (titleSize > minimumTitleSize && wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 99).length > 3) {
+    titleSize -= 2
+    context.font = `900 ${titleSize}px Arial, sans-serif`
+  }
   const titleLines = wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 3)
   const firstLineY = tagY + width * (titleLines.length > 1 ? .19 : .25)
   titleLines.forEach((line, index) => {
@@ -191,7 +207,7 @@ export const renderProject = async (
   project: DailoProject,
   onProgress: (progress: ExportProgress) => void,
   safeMode = false,
-): Promise<{ blob: Blob; extension: 'mp4' | 'webm' }> => {
+): Promise<{ blob: Blob; extension: 'mp4' | 'webm'; skippedCount: number }> => {
   if (!canRenderVideo()) throw new Error('이 기기에서는 영상 합성을 지원하지 않아요. 최신 Safari 또는 Chrome으로 열어주세요.')
   const clips = project.clips.filter((clip) => clip.mediaUrl)
   if (!clips.length) throw new Error('저장할 영상 클립이 없어요.')
@@ -276,35 +292,35 @@ export const renderProject = async (
   })
 
   try {
-    const coverClip = clips.find((clip) => clip.id === project.coverClipId) ?? clips[0]
-    await loadClip(coverClip)
-    await seekVideo(video, coverClip.analysis?.bestMoment ?? Math.min(coverClip.duration * .2, 1))
     recorder.start(400)
-    context.fillStyle = '#111'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    drawCoveredVideo(context, video, canvas.width, canvas.height)
-    drawCoverOverlay(context, project, canvas.width, canvas.height)
-    forceFrame()
-    onProgress({ percent: 3, task: '썸네일을 만들고 있어요' })
-    await delay(850)
-
-    if (project.fastIntro) {
-      for (const clip of clips) {
+    const renderableClips: DailoClip[] = []
+    for (const [index, clip] of clips.entries()) {
+      try {
         await loadClip(clip)
         await seekVideo(video, clip.analysis?.bestMoment ?? Math.min(clip.duration * .32, Math.max(clip.duration - .1, 0)))
-        context.fillStyle = '#fff'
+        context.fillStyle = '#111'
         context.fillRect(0, 0, canvas.width, canvas.height)
         drawCoveredVideo(context, video, canvas.width, canvas.height)
+        drawCoverOverlay(context, project, canvas.width, canvas.height)
         forceFrame()
+        renderableClips.push(clip)
         await delay(200)
+      } catch {
+        // A disconnected source is skipped so the remaining day can still be saved.
       }
+      onProgress({ percent: Math.max(2, Math.round(((index + 1) / clips.length) * 5)), task: `${index + 1}번째 커버 장면을 확인하고 있어요` })
     }
+    if (!renderableClips.length) throw new Error('읽을 수 있는 원본 영상이 없어요. 클립에서 원본을 다시 선택해 주세요.')
 
     let renderedSeconds = 0
-    for (const [index, clip] of clips.entries()) {
+    for (const [index, clip] of renderableClips.entries()) {
       const remainingSeconds = project.outputLength - renderedSeconds
       if (remainingSeconds <= 0) break
-      await loadClip(clip)
+      try {
+        await loadClip(clip)
+      } catch {
+        continue
+      }
       const startAt = Math.min(Math.max(clip.trimStart, 0), Math.max(video.duration - 0.05, 0))
       await seekVideo(video, startAt)
       video.playbackRate = clip.speed
@@ -338,7 +354,7 @@ export const renderProject = async (
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({
-            percent: Math.round(5 + ((index + clipProgress) / clips.length) * 92),
+            percent: Math.round(5 + ((index + clipProgress) / renderableClips.length) * 92),
             task: `${index + 1}번째 장면을 만들고 있어요`,
           })
           if (video.currentTime >= endAt || video.ended) resolve()
@@ -366,8 +382,9 @@ export const renderProject = async (
     }
     recorder.stop()
     const blob = await completed
-    onProgress({ percent: 100, task: '영상이 완성됐어요. 저장 버튼을 눌러주세요.' })
-    return { blob, extension: recorder.mimeType.includes('mp4') ? 'mp4' : 'webm' }
+    const skippedCount = clips.length - renderableClips.length
+    onProgress({ percent: 100, task: skippedCount ? `${skippedCount}개 원본을 제외하고 영상을 완성했어요.` : '영상이 완성됐어요. 저장 버튼을 눌러주세요.' })
+    return { blob, extension: recorder.mimeType.includes('mp4') ? 'mp4' : 'webm', skippedCount }
   } finally {
     video.pause()
     canvasStream.getTracks().forEach((track) => track.stop())

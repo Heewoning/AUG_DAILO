@@ -78,30 +78,44 @@ const waitForMetadata = (video: HTMLVideoElement) =>
 
 const seekVideo = (video: HTMLVideoElement, time: number) =>
   new Promise<void>((resolve) => {
-    const timer = window.setTimeout(resolve, 4_000)
-    video.addEventListener('seeked', () => { window.clearTimeout(timer); resolve() }, { once: true })
+    const finish = () => {
+      window.clearTimeout(timer)
+      video.removeEventListener('seeked', finish)
+      resolve()
+    }
+    const timer = window.setTimeout(finish, 1_500)
+    video.addEventListener('seeked', finish, { once: true })
     video.currentTime = time
   })
 
 const createThumbnail = async (video: HTMLVideoElement, duration: number) => {
-  try {
-    await seekVideo(video, Math.min(Math.max(duration * 0.18, 0.05), 2))
-    const canvas = document.createElement('canvas')
-    canvas.width = 180
-    canvas.height = 320
-    const context = canvas.getContext('2d')
-    if (!context) return ''
-    const sourceRatio = video.videoWidth / video.videoHeight
-    const targetRatio = canvas.width / canvas.height
-    const sourceWidth = sourceRatio > targetRatio ? video.videoHeight * targetRatio : video.videoWidth
-    const sourceHeight = sourceRatio > targetRatio ? video.videoHeight : video.videoWidth / targetRatio
-    const sourceX = (video.videoWidth - sourceWidth) / 2
-    const sourceY = (video.videoHeight - sourceHeight) / 2
-    context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height)
-    return canvas.toDataURL('image/jpeg', 0.64)
-  } catch {
-    return ''
+  const canvas = document.createElement('canvas')
+  canvas.width = 180
+  canvas.height = 320
+  const context = canvas.getContext('2d')
+  if (!context || !video.videoWidth || !video.videoHeight) return ''
+  const sourceRatio = video.videoWidth / video.videoHeight
+  const targetRatio = canvas.width / canvas.height
+  const sourceWidth = sourceRatio > targetRatio ? video.videoHeight * targetRatio : video.videoWidth
+  const sourceHeight = sourceRatio > targetRatio ? video.videoHeight : video.videoWidth / targetRatio
+  const sourceX = (video.videoWidth - sourceWidth) / 2
+  const sourceY = (video.videoHeight - sourceHeight) / 2
+  const moments = [duration * .18, duration * .5, .05]
+  let lastThumbnail = ''
+  for (const moment of moments) {
+    try {
+      await seekVideo(video, Math.min(Math.max(moment, .02), Math.max(duration - .02, .02)))
+      context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height)
+      lastThumbnail = canvas.toDataURL('image/jpeg', 0.7)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let brightness = 0
+      for (let index = 0; index < pixels.length; index += 160) brightness += pixels[index] + pixels[index + 1] + pixels[index + 2]
+      if (brightness / Math.max(pixels.length / 160, 1) > 18) return lastThumbnail
+    } catch {
+      // Try another moment; some mobile codecs cannot seek to the first requested frame.
+    }
   }
+  return lastThumbnail
 }
 
 export const createClipThumbnail = async (mediaUrl: string, duration: number) => {
@@ -121,7 +135,7 @@ export const createClipThumbnail = async (mediaUrl: string, duration: number) =>
 export const fileToClip = async (file: File, options: { thumbnail?: boolean } = {}): Promise<DailoClip> => {
   const mediaUrl = URL.createObjectURL(file)
   const video = document.createElement('video')
-  video.preload = 'metadata'
+  video.preload = 'auto'
   video.muted = true
   video.playsInline = true
   video.src = mediaUrl

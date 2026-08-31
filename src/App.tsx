@@ -150,23 +150,32 @@ function App() {
     })
   }, [])
 
-  const retryThumbnail = useCallback(async (clipId: string) => {
-    const clip = project.clips.find((item) => item.id === clipId)
-    if (!clip) return
-    let refreshedUrl = clip.mediaUrl
-    if (clip.videoBlob) refreshedUrl = URL.createObjectURL(clip.videoBlob)
+  const replaceClipSource = useCallback(async (clipId: string, file: File) => {
+    const previous = project.clips.find((item) => item.id === clipId)
+    if (!previous) return
     try {
-      const thumbnail = await createClipThumbnail(refreshedUrl, clip.duration)
-      if (!thumbnail) throw new Error('미리보기 장면을 만들지 못했어요.')
+      const replacement = await fileToClip(file)
       setProject((current) => ({
         ...current,
-        clips: current.clips.map((item) => item.id === clipId ? { ...item, mediaUrl: refreshedUrl, thumbnail } : item),
+        clips: current.clips.map((item) => item.id === clipId ? {
+          ...item,
+          name: replacement.name,
+          mediaUrl: replacement.mediaUrl,
+          videoBlob: replacement.videoBlob,
+          thumbnail: replacement.thumbnail,
+          duration: replacement.duration,
+          trimStart: 0,
+          trimEnd: replacement.duration,
+          capturedAt: replacement.capturedAt,
+          capturedAtSource: replacement.capturedAtSource,
+          displayTime: replacement.displayTime,
+        } : item),
       }))
-      if (refreshedUrl !== clip.mediaUrl && clip.mediaUrl) URL.revokeObjectURL(clip.mediaUrl)
-      setToast('영상 미리보기를 다시 불러왔어요.')
+      if (previous.mediaUrl) URL.revokeObjectURL(previous.mediaUrl)
+      setSelectedClipId(clipId)
+      setToast('새 원본으로 교체했어요. 문구와 편집 내용은 유지됩니다.')
     } catch {
-      if (refreshedUrl !== clip.mediaUrl) URL.revokeObjectURL(refreshedUrl)
-      setToast('이 영상은 미리보기를 만들 수 없어요. 원본을 다시 선택해 주세요.')
+      setToast('선택한 원본을 읽지 못했어요. 다른 영상 파일을 선택해 주세요.')
     }
   }, [project.clips])
 
@@ -222,6 +231,7 @@ function App() {
         result = await renderProject(project, setExportState, true)
       }
       const fileDate = new Date().toLocaleDateString('en-CA').replaceAll('-', '')
+      if (result.skippedCount) setToast(`${result.skippedCount}개 클립은 원본을 읽지 못해 제외했어요. 나머지 영상은 저장할 수 있어요.`)
       setExportedVideo({ blob: result.blob, fileName: `DAY_IN_LIFE_${fileDate}.${result.extension}` })
       const asset = {
         blob: result.blob,
@@ -307,7 +317,7 @@ function App() {
           onFiles={onFiles}
           onRemove={removeClip}
           onMove={moveClip}
-          onRetryThumbnail={retryThumbnail}
+          onReplace={replaceClipSource}
           onAnalyze={analyze}
         />
       )}
@@ -321,7 +331,7 @@ function App() {
           onUpdateProject={updateProject}
           onOpenArchive={() => setView('archive')}
           onDeleteClip={removeClip}
-          onRetryMedia={retryThumbnail}
+          onReplaceMedia={replaceClipSource}
           onExport={exportVideo}
           exportState={exportState}
           exportError={exportError}
