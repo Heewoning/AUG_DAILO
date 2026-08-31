@@ -49,6 +49,25 @@ const fitText = (context: CanvasRenderingContext2D, text: string, maxWidth: numb
   return `${result}…`
 }
 
+const wrapText = (context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines = 2) => {
+  const requestedLines = text.split(/\n/).filter(Boolean)
+  const lines: string[] = []
+  for (const requested of requestedLines.length ? requestedLines : [text]) {
+    let line = ''
+    for (const character of Array.from(requested)) {
+      if (line && context.measureText(line + character).width > maxWidth) {
+        lines.push(line)
+        line = character
+      } else line += character
+    }
+    if (line) lines.push(line)
+  }
+  if (lines.length <= maxLines) return lines
+  const visible = lines.slice(0, maxLines)
+  visible[maxLines - 1] = fitText(context, lines.slice(maxLines - 1).join(''), maxWidth)
+  return visible
+}
+
 const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number) => {
   const presentation = activityTextProvider.present(clip.activity)
   const centerY = height * 0.5
@@ -139,14 +158,20 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.strokeStyle = 'rgba(24,18,14,.95)'
   context.lineWidth = Math.max(5, width * .009)
   context.textAlign = 'center'
-  context.font = `900 ${Math.round(width * 0.09)}px Arial, sans-serif`
-  const title = fitText(context, project.coverTitle || '오늘의 하루.EXE', width * .72)
-  context.strokeText(title, safeCenterX, tagY + width * .25)
-  context.fillText(title, safeCenterX, tagY + width * .25)
+  const titleSize = Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100))
+  context.font = `900 ${titleSize}px Arial, sans-serif`
+  const titleLines = wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 2)
+  const firstLineY = tagY + width * (titleLines.length > 1 ? .21 : .25)
+  titleLines.forEach((line, index) => {
+    const y = firstLineY + index * titleSize * 1.02
+    context.strokeText(line, safeCenterX, y)
+    context.fillText(line, safeCenterX, y)
+  })
   context.font = `600 ${Math.round(width * .03)}px Tahoma, sans-serif`
   const english = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
-  context.strokeText(english, safeCenterX, tagY + width * .32)
-  context.fillText(english, safeCenterX, tagY + width * .32)
+  const englishY = firstLineY + titleLines.length * titleSize * 1.02 + width * .025
+  context.strokeText(english, safeCenterX, englishY)
+  context.fillText(english, safeCenterX, englishY)
   context.textAlign = 'start'
 }
 
@@ -190,6 +215,34 @@ export const renderProject = async (
   const video = document.createElement('video')
   video.playsInline = true
   video.preload = 'auto'
+  const temporaryUrls = new Set<string>()
+  const clipSources = new Map<string, string>()
+  const sourceFor = (clip: DailoClip, refresh = false) => {
+    if (!clip.videoBlob) return clip.mediaUrl
+    const current = clipSources.get(clip.id)
+    if (current && !refresh) return current
+    if (current) { URL.revokeObjectURL(current); temporaryUrls.delete(current) }
+    const url = URL.createObjectURL(clip.videoBlob)
+    temporaryUrls.add(url)
+    clipSources.set(clip.id, url)
+    return url
+  }
+  const loadClip = async (clip: DailoClip) => {
+    const load = async (refresh = false) => {
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+      video.src = sourceFor(clip, refresh)
+      video.load()
+      await waitForMedia(video, 'loadedmetadata', 20_000)
+    }
+    try {
+      await load()
+    } catch (error) {
+      if (!clip.videoBlob) throw error
+      await load(true)
+    }
+  }
   const videoSource = audioContext.createMediaElementSource(video)
   const videoGain = audioContext.createGain()
   videoSource.connect(videoGain).connect(audioDestination)
@@ -222,8 +275,7 @@ export const renderProject = async (
 
   try {
     const coverClip = clips.find((clip) => clip.id === project.coverClipId) ?? clips[0]
-    video.src = coverClip.mediaUrl
-    if (video.readyState < 1) await waitForMedia(video, 'loadedmetadata')
+    await loadClip(coverClip)
     await seekVideo(video, coverClip.analysis?.bestMoment ?? Math.min(coverClip.duration * .2, 1))
     recorder.start(400)
     context.fillStyle = '#111'
@@ -235,15 +287,14 @@ export const renderProject = async (
     await delay(850)
 
     if (project.fastIntro) {
-      for (const clip of clips.slice(0, 6)) {
-        video.src = clip.mediaUrl
-        if (video.readyState < 1) await waitForMedia(video, 'loadedmetadata')
+      for (const clip of clips) {
+        await loadClip(clip)
         await seekVideo(video, clip.analysis?.bestMoment ?? Math.min(clip.duration * .32, Math.max(clip.duration - .1, 0)))
         context.fillStyle = '#fff'
         context.fillRect(0, 0, canvas.width, canvas.height)
         drawCoveredVideo(context, video, canvas.width, canvas.height)
         forceFrame()
-        await delay(140)
+        await delay(200)
       }
     }
 
@@ -251,8 +302,7 @@ export const renderProject = async (
     for (const [index, clip] of clips.entries()) {
       const remainingSeconds = project.outputLength - renderedSeconds
       if (remainingSeconds <= 0) break
-      video.src = clip.mediaUrl
-      if (video.readyState < 1) await waitForMedia(video, 'loadedmetadata')
+      await loadClip(clip)
       const startAt = Math.min(Math.max(clip.trimStart, 0), Math.max(video.duration - 0.05, 0))
       await seekVideo(video, startAt)
       video.playbackRate = clip.speed
@@ -321,6 +371,7 @@ export const renderProject = async (
     canvasStream.getTracks().forEach((track) => track.stop())
     combinedStream.getTracks().forEach((track) => track.stop())
     if (recorder.state !== 'inactive') recorder.stop()
+    temporaryUrls.forEach((url) => URL.revokeObjectURL(url))
     await audioContext.close().catch(() => undefined)
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { moods, popupSuggestions } from '../data'
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import { formatDuration } from '../services/mediaMetadata'
@@ -35,6 +35,9 @@ export const EditorScreen = ({
 }: EditorProps) => {
   const [tab, setTab] = useState<EditorTab>('COVER')
   const [showAssistant, setShowAssistant] = useState(false)
+  const [previewAll, setPreviewAll] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState(0)
+  const previewVideoRef = useRef<HTMLVideoElement>(null)
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedClipId) ?? project.clips[0],
     [project.clips, selectedClipId],
@@ -44,6 +47,20 @@ export const EditorScreen = ({
     onUpdateClip(selected.id, { voice })
   }, [onUpdateClip, selected])
   const recorder = useVoiceRecorder(finishVoice)
+
+  useEffect(() => {
+    if (!previewAll || !previewVideoRef.current) return
+    const video = previewVideoRef.current
+    const clip = project.clips[previewIndex]
+    if (!clip) return
+    const play = () => {
+      video.currentTime = Math.min(clip.trimStart, Math.max(video.duration - .05, 0))
+      void video.play().catch(() => undefined)
+    }
+    if (video.readyState >= 1) play()
+    else video.addEventListener('loadedmetadata', play, { once: true })
+    return () => video.removeEventListener('loadedmetadata', play)
+  }, [previewAll, previewIndex, project.clips])
 
   if (!selected) return <main className="screen"><p>편집할 클립이 없습니다.</p></main>
 
@@ -58,8 +75,25 @@ export const EditorScreen = ({
   const selectedPresentation = activityTextProvider.present(selected.activity)
   const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
   const previewClip = tab === 'COVER' ? coverClip : selected
-  const previewPresentation = activityTextProvider.present(previewClip.activity)
+  const activePreviewClip = previewAll ? project.clips[previewIndex] ?? selected : previewClip
+  const previewPresentation = activityTextProvider.present(activePreviewClip.activity)
   const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
+
+  const advancePreview = () => {
+    if (!previewAll) return
+    if (previewIndex < project.clips.length - 1) {
+      const next = previewIndex + 1
+      setPreviewIndex(next)
+      onSelect(project.clips[next].id)
+    } else setPreviewAll(false)
+  }
+
+  const startPreview = () => {
+    setTab('CLIP')
+    setPreviewIndex(0)
+    setPreviewAll(true)
+    onSelect(project.clips[0].id)
+  }
 
   return (
     <main className="editor-screen">
@@ -85,7 +119,7 @@ export const EditorScreen = ({
           <div className="clip-sidebar__list">
             {project.clips.map((clip, index) => (
               <article key={clip.id} className={`clip-sidebar-card ${clip.id === selected.id ? 'active' : ''}`}>
-                <button className="clip-sidebar-card__select" onClick={() => onSelect(clip.id)}>
+                <button className="clip-sidebar-card__select" onClick={() => { setPreviewAll(false); onSelect(clip.id) }}>
                   <em>{String(index + 1).padStart(2, '0')}</em>
                   {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <i>VIDEO</i>}
                   <span><b>{clip.displayTime}</b><small>{clip.name}</small></span>
@@ -101,31 +135,31 @@ export const EditorScreen = ({
         </aside>
 
         <section className="preview-column">
-          <div className="preview-label"><span>실시간 미리보기 · 9:16</span><span>{formatDuration(selected.duration)}</span></div>
+          <div className="preview-label"><span>실시간 미리보기 · 9:16</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
           <div className="phone-preview">
-            <video key={previewClip.id} src={previewClip.mediaUrl} controls playsInline preload="metadata" />
+            <video ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} src={activePreviewClip.mediaUrl} controls playsInline preload="metadata" onEnded={advancePreview} onTimeUpdate={(event) => { if (previewAll && event.currentTarget.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />
             <div className="video-gradient" />
             {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
             {tab === 'COVER' ? (
               <div className="reference-cover-overlay">
                 <span className="xp-cover-tag"><i>{previewPresentation.icon}</i> DAY_IN_LIFE.EXE <b>×</b></span>
                 <small>{project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY'}</small>
-                <h2>{project.coverTitle || '오늘의 하루'}</h2>
+                <h2 style={{ fontSize: `${Math.max(25, 42 * ((project.coverFontScale ?? 100) / 100))}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
                 <p>{coverEnglish}</p>
               </div>
             ) : (
               <div className="reference-scene-overlay">
-                <span className="xp-scene-tag"><i>{selected.activityIcon || selectedPresentation.icon}</i> CLIP_INFO.EXE <b>×</b></span>
-                <time>{selected.displayTime}</time>
-                <strong>{selected.activity || '이 장면의 문구를 입력해 주세요'}</strong>
-                <small>{selected.activityEnglish || selectedPresentation.english}</small>
+                <span className="xp-scene-tag"><i>{activePreviewClip.activityIcon || previewPresentation.icon}</i> CLIP_INFO.EXE <b>×</b></span>
+                <time>{activePreviewClip.displayTime}</time>
+                <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
+                <small>{activePreviewClip.activityEnglish || previewPresentation.english}</small>
               </div>
             )}
-            {selected.caption && tab !== 'COVER' && <p className="manual-video-caption">{selected.caption}</p>}
-            {selected.popup.enabled && tab !== 'COVER' && (
-              <RetroWindow title={selected.popup.title} className="video-popup compact-video-popup">
-                <div><span className="warning-icon">!</span><b>{selected.popup.message}</b></div>
-                <RetroButton>{selected.popup.button}</RetroButton>
+            {activePreviewClip.caption && tab !== 'COVER' && <p className="manual-video-caption">{activePreviewClip.caption}</p>}
+            {activePreviewClip.popup.enabled && tab !== 'COVER' && (
+              <RetroWindow title={activePreviewClip.popup.title} className="video-popup compact-video-popup">
+                <div><span className="warning-icon">!</span><b>{activePreviewClip.popup.message}</b></div>
+                <RetroButton>{activePreviewClip.popup.button}</RetroButton>
               </RetroWindow>
             )}
           </div>
@@ -142,12 +176,13 @@ export const EditorScreen = ({
           {tab === 'COVER' && (
             <div className="inspector-panel cover-panel">
               <div className="panel-guide"><i>1</i><p><b>영상의 첫 화면을 골라요</b><br />선택한 사진 뒤에 빠른 장면들이 이어집니다.</p></div>
-              <label>썸네일 제목<input value={project.coverTitle} maxLength={24} onChange={(event) => onUpdateProject({ coverTitle: event.target.value })} /></label>
+              <label>썸네일 제목<textarea rows={2} value={project.coverTitle} maxLength={40} placeholder={'예: 서진이의 하루\nDAY VLOG'} onChange={(event) => onUpdateProject({ coverTitle: event.target.value })} /><small className="field-help">Enter를 누르면 원하는 위치에서 줄을 바꿀 수 있어요.</small></label>
+              <label>제목 글자 크기 <span>{project.coverFontScale ?? 100}%</span><input type="range" min="70" max="115" step="5" value={project.coverFontScale ?? 100} onChange={(event) => onUpdateProject({ coverFontScale: Number(event.target.value) })} /></label>
               <p className="suggestion-label">대표 장면 선택</p>
               <div className="cover-choices">
                 {project.clips.map((clip, index) => <button key={clip.id} className={(project.coverClipId ?? project.clips[0]?.id) === clip.id ? 'active' : ''} onClick={() => { onUpdateProject({ coverClipId: clip.id }); onSelect(clip.id) }}>{clip.thumbnail ? <img src={clip.thumbnail} alt={`${index + 1}번 썸네일`} /> : <span>VIDEO</span>}<i>{index + 1}</i></button>)}
               </div>
-              <label className="toggle-field"><span>빠른 오프닝<small>썸네일 다음에 장면들이 빠르게 지나가요</small></span><input type="checkbox" checked={project.fastIntro} onChange={(event) => onUpdateProject({ fastIntro: event.target.checked })} /></label>
+              <label className="toggle-field"><span>0.2초 전체 컷 오프닝<small>썸네일 다음에 모든 장면이 0.2초씩 재생돼요.</small></span><input type="checkbox" checked={project.fastIntro} onChange={(event) => onUpdateProject({ fastIntro: event.target.checked })} /></label>
             </div>
           )}
 

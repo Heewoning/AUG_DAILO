@@ -192,6 +192,8 @@ button { cursor: pointer; }
 .preview-label, .preview-meta { width: 100%; display: flex; justify-content: space-between; color: #c8b9a5; font: 700 8px/1 var(--mono); }
 .preview-label { margin-bottom: 8px; }
 .preview-meta { margin-top: 8px; }
+.preview-label button { min-height: 25px; padding: 3px 8px; border: 1px solid #8b7969; color: #30251f; background: var(--butter); font: 800 9px/1 Tahoma,"Malgun Gothic",sans-serif; }
+.preview-label button.active { color: #fff; border-color: #fff; background: var(--blue); }
 .phone-preview { height: calc(100% - 35px); aspect-ratio: 9/16; max-width: 100%; position: relative; overflow: hidden; border: 2px solid #0f0c0a; background: #080706; box-shadow: 0 0 0 1px #75675e, 12px 14px 30px rgba(0,0,0,.3); }
 .phone-preview video { width: 100%; height: 100%; object-fit: contain; }
 .video-gradient { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(transparent 58%, rgba(0,0,0,.75)); }
@@ -425,6 +427,21 @@ button { cursor: pointer; }
   .monthly-log .retro-window__body > * { grid-column: 1 !important; }
 }
 
+/* Mobile editor controls stay fully visible and never sit under app navigation. */
+@media (max-width: 1099px) {
+  .app-shell--editor { padding-bottom: 0; }
+  .app-shell--editor .bottom-nav { position: static; left: auto; bottom: auto; transform: none; display: grid; margin: 22px auto; }
+  .app-shell--editor .tool-tabs { height: auto; min-height: 88px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: visible; }
+  .app-shell--editor .tool-tabs button { min-width: 0; min-height: 44px; border-bottom: 1px solid #c5b49c; font-size: 11px; }
+  .app-shell--editor .inspector-panel { padding-bottom: 35px; }
+}
+
+@media (max-width: 600px) {
+  .clip-sidebar-card__fields { grid-template-columns: 1fr; }
+  .clip-copy-field { grid-column: 1; }
+  .clip-sidebar__list .clip-record-shortcut { grid-column: 1; }
+}
+
 /* Reference-led vlog composition: full video first, tiny XP details second. */
 .phone-preview video { object-fit: cover; }
 .reference-cover-overlay,
@@ -438,7 +455,7 @@ button { cursor: pointer; }
 .xp-cover-tag b,
 .xp-scene-tag b { width: 17px; height: 17px; margin-left: 3px; display: grid; place-items: center; border: 1px solid #fff; border-radius: 3px; background: #d84b2f; font-size: 11px; }
 .reference-cover-overlay > small { display: block; margin-bottom: 9px; color: #fff1a8; font: 800 10px/1.2 Tahoma, sans-serif; letter-spacing: .04em; }
-.reference-cover-overlay h2 { margin: 0 auto; max-width: 92%; color: #fff; font: 950 clamp(30px,4.5vw,58px)/.95 "Arial Black", "Malgun Gothic", sans-serif; letter-spacing: -.07em; -webkit-text-stroke: 1.5px #29211d; paint-order: stroke fill; filter: drop-shadow(3px 4px 0 rgba(0,0,0,.55)); word-break: keep-all; }
+.reference-cover-overlay h2 { margin: 0 auto; max-width: 92%; color: #fff; font-family: "Arial Black", "Malgun Gothic", sans-serif; font-weight: 950; line-height: .98; letter-spacing: -.07em; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; -webkit-text-stroke: 1.5px #29211d; paint-order: stroke fill; filter: drop-shadow(3px 4px 0 rgba(0,0,0,.55)); }
 .reference-cover-overlay p { width: max-content; max-width: 88%; margin: 15px auto 0; padding: 6px 12px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; background: rgba(17,14,12,.76); color: #fff; font: 700 9px/1.2 Tahoma, sans-serif; text-shadow: none; }
 .reference-scene-overlay time { display: block; font: 300 clamp(29px,3.4vw,46px)/1 Tahoma, sans-serif; letter-spacing: -.08em; }
 .reference-scene-overlay strong { display: block; margin-top: 6px; font: 800 clamp(16px,2vw,28px)/1.15 "Malgun Gothic", sans-serif; word-break: keep-all; }
@@ -723,4 +740,17 @@ button { cursor: pointer; }
   .simple-hero { padding-top: 30px; }.simple-hero .hero-copy h1 { font-size: 40px; }.simple-hero .hero-kicker { font-size: 15px; }.home-mini-steps { gap: 4px; }.home-mini-steps li { font-size: 10px; }.home-mini-steps i { width: 21px; height: 21px; }.day-launcher-art { height: 300px; }.launcher-files { inset-inline: 15px; }.launcher-files > span { width: 62px; height: 62px; }.continue-day { align-items: stretch; flex-direction: column; gap: 13px; }
   .quest-steps { margin-bottom: 38px; }.quest-steps > span { font-size: 10px; }.quest-heading h1, .quest-heading--row h1 { font-size: 38px; }.quest-heading--row { display: block; }.back-step { padding-left: 0; }.simple-mode-grid > button { min-height: 82px; padding: 12px; }.simple-mode-grid > button.active { padding: 11px; }.quest-next { align-items: stretch; flex-direction: column; gap: 18px; }.quest-next .retro-button { width: 100%; }.compact-drop-zone { padding: 22px 18px; grid-template-columns: 1fr; justify-items: center; text-align: center; }.compact-drop-zone p { font-size: 12px; }.quest-review { padding: 13px; }
   .editor-quest-bar { justify-content: space-between; gap: 4px; }.editor-quest-bar span { gap: 4px; font-size: 9px; }.editor-quest-bar i { width: 21px; height: 21px; }.preview-column { height: min(54vh,500px); }.scene-message-card { left: 15%; right: 15%; }.clip-sidebar-card__fields { grid-template-columns: 88px minmax(0,1fr); }.tool-tabs button { min-width: 72px; }.vlog-grid { grid-template-columns: 1fr 1fr; }.simple-archive .archive-window > .retro-window__body { padding: 12px; }
+}
+
+@media (max-width: 1099px) {
+  .app-shell--editor { padding-bottom: 0; }
+  .app-shell--editor .bottom-nav { position: static; left: auto; bottom: auto; transform: none; display: grid; margin: 22px auto; }
+  .app-shell--editor .tool-tabs { height: auto; min-height: 88px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: visible; }
+  .app-shell--editor .tool-tabs button { min-width: 0; min-height: 44px; border-bottom: 1px solid #c5b49c; font-size: 11px; }
+  .app-shell--editor .inspector-panel { padding-bottom: 35px; }
+}
+
+@media (max-width: 600px) {
+  .clip-sidebar-card__fields { grid-template-columns: 1fr; }
+  .clip-copy-field, .clip-sidebar__list .clip-record-shortcut { grid-column: 1; }
 }

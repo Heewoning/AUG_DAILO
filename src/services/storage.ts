@@ -100,6 +100,7 @@ const normalizeStoredProject = (value: unknown, index: number): StoredProject | 
     outputLength: project.outputLength ?? 30,
     customTheme: typeof project.customTheme === 'string' ? project.customTheme : '',
     coverTitle: typeof project.coverTitle === 'string' ? project.coverTitle : '오늘의 하루.EXE',
+    coverFontScale: Number.isFinite(project.coverFontScale) ? Number(project.coverFontScale) : 100,
     fastIntro: project.fastIntro ?? true,
   } as StoredProject
 }
@@ -204,6 +205,7 @@ export const loadProject = async (id: string): Promise<DailoProject | undefined>
     ...project,
     customTheme: project.customTheme ?? '',
     coverTitle: project.coverTitle ?? '오늘의 하루.EXE',
+    coverFontScale: project.coverFontScale ?? 100,
     fastIntro: project.fastIntro ?? true,
     clips,
     exportAsset: project.exportAsset ? {

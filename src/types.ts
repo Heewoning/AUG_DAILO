@@ -89,6 +89,7 @@ export interface DailoProject {
   customTheme: string
   coverClipId?: string
   coverTitle: string
+  coverFontScale: number
   fastIntro: boolean
   exportAsset?: ExportedAsset
 }
@@ -129,6 +130,7 @@ export const createProject = (mode: ProjectMode = 'DAY IN LIFE'): DailoProject =
     outputLength: 30,
     customTheme: '',
     coverTitle: '오늘의 하루.EXE',
+    coverFontScale: 100,
     fastIntro: true,
   }
 }

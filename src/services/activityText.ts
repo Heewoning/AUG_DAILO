@@ -44,14 +44,49 @@ const rules: Array<{ pattern: RegExp; english: string; icon: string }> = [
   { pattern: /하루/, english: 'A day in my life', icon: '💿' },
 ]
 
+const initials = ['g', 'kk', 'n', 'd', 'tt', 'r', 'm', 'b', 'pp', 's', 'ss', '', 'j', 'jj', 'ch', 'k', 't', 'p', 'h']
+const vowels = ['a', 'ae', 'ya', 'yae', 'eo', 'e', 'yeo', 'ye', 'o', 'wa', 'wae', 'oe', 'yo', 'u', 'wo', 'we', 'wi', 'yu', 'eu', 'ui', 'i']
+const finals = ['', 'k', 'k', 'ks', 'n', 'n', 'nh', 't', 'l', 'lk', 'lm', 'lb', 'ls', 'lt', 'lp', 'lh', 'm', 'p', 'ps', 't', 't', 'ng', 't', 't', 'k', 't', 'p', 'h']
+
+const romanizeKorean = (text: string) => Array.from(text).map((character) => {
+  const code = character.charCodeAt(0) - 0xac00
+  if (code < 0 || code > 11_171) return character
+  const initial = Math.floor(code / 588)
+  const vowel = Math.floor((code % 588) / 28)
+  const final = code % 28
+  return `${initials[initial]}${vowels[vowel]}${finals[final]}`
+}).join('')
+
+const nameInEnglish = (name: string) => {
+  const romanized = romanizeKorean(name.replace(/\s/g, ''))
+  return romanized ? romanized.charAt(0).toUpperCase() + romanized.slice(1) : name
+}
+
+const contextualTranslation = (text: string) => {
+  const together = text.match(/^(.+?)(?:이랑|랑|와|과)\s*함께\s*(.*)$/)
+  if (together) return { english: `With ${nameInEnglish(together[1])}${together[2] ? ` ${together[2]}` : ''}`, icon: '💗' }
+
+  const possessive = text.match(/^(.+?)이?의\s*(아침|하루|저녁|생일|집|방)\s*(.*)$/)
+  if (possessive) {
+    const nouns: Record<string, string> = { 아침: 'morning', 하루: 'day', 저녁: 'evening', 생일: 'birthday', 집: 'home', 방: 'room' }
+    return { english: `${nameInEnglish(possessive[1])}'s ${nouns[possessive[2]]}${possessive[3] ? ` ${romanizeKorean(possessive[3])}` : ''}`, icon: possessive[2] === '생일' ? '🎂' : '💗' }
+  }
+
+  const dayWith = text.match(/^(.+?)(?:와|과|이랑|랑)\s*(.+)$/)
+  if (dayWith) return { english: `${romanizeKorean(dayWith[2])} with ${nameInEnglish(dayWith[1])}`, icon: '💗' }
+  return undefined
+}
+
 class LocalKoreanActivityProvider implements ActivityTextProvider {
   readonly id = 'local-ko-en-v1'
 
   present(text: string) {
     const normalized = text.trim()
     if (!normalized) return { english: 'Write your moment', icon: '✦' }
+    const contextual = contextualTranslation(normalized)
+    if (contextual) return contextual
     const matched = rules.find(({ pattern }) => pattern.test(normalized))
-    const english = exactTranslations[normalized] ?? matched?.english ?? (!/[가-힣]/.test(normalized) ? normalized : 'My daily moment')
+    const english = exactTranslations[normalized] ?? matched?.english ?? (!/[가-힣]/.test(normalized) ? normalized : romanizeKorean(normalized))
     return { english, icon: matched?.icon ?? '✦' }
   }
 }
