@@ -78,7 +78,8 @@ const waitForMetadata = (video: HTMLVideoElement) =>
 
 const seekVideo = (video: HTMLVideoElement, time: number) =>
   new Promise<void>((resolve) => {
-    video.addEventListener('seeked', () => resolve(), { once: true })
+    const timer = window.setTimeout(resolve, 4_000)
+    video.addEventListener('seeked', () => { window.clearTimeout(timer); resolve() }, { once: true })
     video.currentTime = time
   })
 
@@ -109,6 +110,7 @@ export const createClipThumbnail = async (mediaUrl: string, duration: number) =>
   video.muted = true
   video.playsInline = true
   video.src = mediaUrl
+  video.load()
   await waitForMetadata(video)
   const thumbnail = await createThumbnail(video, duration)
   video.removeAttribute('src')

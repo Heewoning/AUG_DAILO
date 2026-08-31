@@ -150,6 +150,26 @@ function App() {
     })
   }, [])
 
+  const retryThumbnail = useCallback(async (clipId: string) => {
+    const clip = project.clips.find((item) => item.id === clipId)
+    if (!clip) return
+    let refreshedUrl = clip.mediaUrl
+    if (clip.videoBlob) refreshedUrl = URL.createObjectURL(clip.videoBlob)
+    try {
+      const thumbnail = await createClipThumbnail(refreshedUrl, clip.duration)
+      if (!thumbnail) throw new Error('미리보기 장면을 만들지 못했어요.')
+      setProject((current) => ({
+        ...current,
+        clips: current.clips.map((item) => item.id === clipId ? { ...item, mediaUrl: refreshedUrl, thumbnail } : item),
+      }))
+      if (refreshedUrl !== clip.mediaUrl && clip.mediaUrl) URL.revokeObjectURL(clip.mediaUrl)
+      setToast('영상 미리보기를 다시 불러왔어요.')
+    } catch {
+      if (refreshedUrl !== clip.mediaUrl) URL.revokeObjectURL(refreshedUrl)
+      setToast('이 영상은 미리보기를 만들 수 없어요. 원본을 다시 선택해 주세요.')
+    }
+  }, [project.clips])
+
   const analyze = useCallback(async () => {
     if (!project.clips.length) return
     const sourceProject = project
@@ -288,6 +308,7 @@ function App() {
           onFiles={onFiles}
           onRemove={removeClip}
           onMove={moveClip}
+          onRetryThumbnail={retryThumbnail}
           onAnalyze={analyze}
         />
       )}

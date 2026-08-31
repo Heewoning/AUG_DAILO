@@ -96,7 +96,7 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.strokeText(korean, width / 2, centerY + width * .075)
   context.fillText(korean, width / 2, centerY + width * .075)
   context.font = `500 ${Math.round(width * 0.03)}px Tahoma, Arial, sans-serif`
-  const english = fitText(context, clip.activityEnglish || presentation.english, width * .78)
+  const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish || presentation.english : presentation.english, width * .78)
   context.strokeText(english, width / 2, centerY + width * .125)
   context.fillText(english, width / 2, centerY + width * .125)
   context.textAlign = 'start'

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { moods, popupSuggestions } from '../data'
-import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import { formatDuration } from '../services/mediaMetadata'
 import { activityTextProvider } from '../services/activityText'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
-import type { DailoClip, DailoProject, EditorTab, Transition, VoiceTrack } from '../types'
+import type { DailoClip, DailoProject, EditorTab, Transition } from '../types'
 
 interface EditorProps {
   project: DailoProject
@@ -23,9 +22,9 @@ interface EditorProps {
   onCloseExport: () => void
 }
 
-const tabs: EditorTab[] = ['COVER', 'CLIP', 'VOICE', 'TEXT', 'TRANSITION', 'POPUP']
+const tabs: EditorTab[] = ['COVER', 'CLIP', 'TEXT', 'TRANSITION', 'POPUP']
 const tabLabels: Record<EditorTab, string> = {
-  COVER: '썸네일', CLIP: '장면', TEXT: '자막', VOICE: '설명 녹음', TRANSITION: '전환', POPUP: '말풍선',
+  COVER: '썸네일', CLIP: '장면', TEXT: '자막', TRANSITION: '전환', POPUP: '말풍선',
 }
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 
@@ -42,12 +41,6 @@ export const EditorScreen = ({
     () => project.clips.find((clip) => clip.id === selectedClipId) ?? project.clips[0],
     [project.clips, selectedClipId],
   )
-  const finishVoice = useCallback((voice: VoiceTrack) => {
-    if (!selected) return
-    onUpdateClip(selected.id, { voice })
-  }, [onUpdateClip, selected])
-  const recorder = useVoiceRecorder(finishVoice)
-
   useEffect(() => {
     if (!previewAll || !previewVideoRef.current) return
     const video = previewVideoRef.current
@@ -69,14 +62,22 @@ export const EditorScreen = ({
 
   const updateActivity = (clip: DailoClip, activity: string) => {
     const presentation = activityTextProvider.present(activity)
-    onUpdateClip(clip.id, { activity, activityEnglish: presentation.english, activityIcon: presentation.icon })
+    onUpdateClip(clip.id, { activity, activityEnglish: presentation.english, activityEnglishEdited: false, activityIcon: presentation.icon })
   }
 
-  const selectedPresentation = activityTextProvider.present(selected.activity)
+  const presentationFor = (clip: DailoClip) => {
+    const automatic = activityTextProvider.present(clip.activity)
+    return {
+      english: clip.activityEnglishEdited ? clip.activityEnglish || automatic.english : automatic.english,
+      icon: automatic.icon,
+    }
+  }
+
+  const selectedPresentation = presentationFor(selected)
   const coverClip = project.clips.find((clip) => clip.id === project.coverClipId) ?? project.clips[0]
   const previewClip = tab === 'COVER' ? coverClip : selected
   const activePreviewClip = previewAll ? project.clips[previewIndex] ?? selected : previewClip
-  const previewPresentation = activityTextProvider.present(activePreviewClip.activity)
+  const previewPresentation = presentationFor(activePreviewClip)
   const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
 
   const advancePreview = () => {
@@ -109,7 +110,7 @@ export const EditorScreen = ({
 
       <nav className="editor-quest-bar" aria-label="꾸미기 진행 단계">
         <span className={project.coverClipId ? 'done' : 'active'}><i>{project.coverClipId ? '✓' : '1'}</i>썸네일</span>
-        <span className={project.clips.some((clip) => clip.activity || clip.voice) ? 'done' : ''}><i>2</i>장면 꾸미기</span>
+        <span className={project.clips.some((clip) => clip.activity) ? 'done' : ''}><i>2</i>장면 꾸미기</span>
         <span><i>3</i>영상 저장</span>
       </nav>
 
@@ -126,8 +127,7 @@ export const EditorScreen = ({
                 </button>
                 <div className="clip-sidebar-card__fields">
                   <label><span>촬영 시간 · 자동</span><input aria-label={`${index + 1}번 클립 시간`} value={clip.displayTime} onChange={(event) => onUpdateClip(clip.id, { displayTime: event.target.value })} /></label>
-                  <label className="clip-copy-field"><span>장면 문구</span><input aria-label={`${index + 1}번 클립 문구`} value={clip.activity} placeholder="예: 퇴근 후 카페" onChange={(event) => updateActivity(clip, event.target.value)} /><small className="auto-english">{clip.activityIcon || activityTextProvider.present(clip.activity).icon} EN · {clip.activityEnglish || activityTextProvider.present(clip.activity).english}</small></label>
-                  <button type="button" className="clip-record-shortcut" onClick={() => { onSelect(clip.id); setTab('VOICE') }}>● 설명 녹음</button>
+                  <label className="clip-copy-field"><span>장면 문구</span><input aria-label={`${index + 1}번 클립 문구`} value={clip.activity} placeholder="예: 퇴근 후 카페" onChange={(event) => updateActivity(clip, event.target.value)} /><small className="auto-english">{presentationFor(clip).icon} EN · {presentationFor(clip).english}</small></label>
                 </div>
               </article>
             ))}
@@ -152,7 +152,7 @@ export const EditorScreen = ({
                 <span className="xp-scene-tag"><i>{activePreviewClip.activityIcon || previewPresentation.icon}</i> CLIP_INFO.EXE <b>×</b></span>
                 <time>{activePreviewClip.displayTime}</time>
                 <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
-                <small>{activePreviewClip.activityEnglish || previewPresentation.english}</small>
+                <small>{previewPresentation.english}</small>
               </div>
             )}
             {activePreviewClip.caption && tab !== 'COVER' && <p className="manual-video-caption">{activePreviewClip.caption}</p>}
@@ -190,7 +190,7 @@ export const EditorScreen = ({
             <div className="inspector-panel">
               <label>촬영 시간 <span>AUTO</span><input value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /><small className="field-help">영상 선택 시 촬영 정보와 자동 연동돼요.</small></label>
               <label>장면 문구<input value={selected.activity} placeholder="예: 다이소 출근" onChange={(event) => updateActivity(selected, event.target.value)} /></label>
-              <div className="translation-preview"><i>{selected.activityIcon || selectedPresentation.icon}</i><span><small>AUTO ENGLISH</small><b>{selected.activityEnglish || selectedPresentation.english}</b></span></div>
+              <div className="translation-preview translation-editor"><i>{selectedPresentation.icon}</i><label><small>ENGLISH · 자동 번역 후 직접 수정 가능</small><input value={selectedPresentation.english} onChange={(event) => onUpdateClip(selected.id, { activityEnglish: event.target.value, activityEnglishEdited: true })} /></label>{selected.activityEnglishEdited && <button onClick={() => onUpdateClip(selected.id, { activityEnglish: activityTextProvider.present(selected.activity).english, activityEnglishEdited: false })}>자동 번역</button>}</div>
               <details className="advanced-tools">
                 <summary>상세 편집 열기</summary>
                 <div className="field-row"><label>시작 위치<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>끝 위치<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>
@@ -206,30 +206,8 @@ export const EditorScreen = ({
           {tab === 'TEXT' && (
             <div className="inspector-panel">
               <label>직접 쓰는 자막<textarea rows={5} value={selected.caption} placeholder="화면 아래에 보여줄 자막을 직접 적어 주세요." onChange={(event) => onUpdateClip(selected.id, { caption: event.target.value })} /></label>
-              <div className="info-box"><i>i</i><p><b>장면 문구 · 녹음 · 자막은 각각 따로예요.</b><br />내가 이 칸에 적은 내용만 자막으로 표시됩니다.</p></div>
+              <div className="info-box"><i>i</i><p><b>장면 문구와 자막은 각각 따로예요.</b><br />내가 이 칸에 적은 내용만 자막으로 표시됩니다.</p></div>
               <label>자막 스타일<select><option>레트로 자막</option><option>심플</option><option>타자기</option><option>에디토리얼</option></select></label>
-            </div>
-          )}
-
-          {tab === 'VOICE' && (
-            <div className="inspector-panel voice-panel">
-              <div className="user-voice-only"><span>●</span><div><b>이 장면을 내 목소리로 설명해요</b><small>문구와 자막은 바뀌지 않아요</small></div></div>
-              {recorder.recording ? (
-                <div className="recording-card"><span>RECORDING...</span><b>{recorder.seconds.toFixed(1)}s</b><div className="waveform">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div><p>{recorder.transcript || '말씀해 주세요. 내 목소리를 듣고 있어요.'}</p><RetroButton onClick={recorder.stop}>■ STOP & SAVE</RetroButton></div>
-              ) : (
-                <button className="record-button" onClick={() => void recorder.start()}><span>●</span><b>내 목소리 녹음하기</b><small>RECORD VOICE MEMO</small></button>
-              )}
-              {recorder.error && <p className="record-error">{recorder.error}</p>}
-              <p className="support-note">녹음은 영상의 소리로만 사용돼요. 장면 문구와 자막은 자동으로 바뀌지 않습니다.</p>
-              {selected.voice && (
-                <div className="saved-voice">
-                  <div><b>설명 녹음 · {Math.round(selected.voice.duration)}초</b><small>영상에 내 목소리로 재생됩니다.</small></div>
-                  {selected.voice.url && <audio src={selected.voice.url} controls />}
-                  <label>VOICE VOLUME <span>{selected.voice.volume}%</span><input type="range" min="0" max="100" value={selected.voice.volume} onChange={(event) => onUpdateClip(selected.id, { voice: { ...selected.voice!, volume: Number(event.target.value) } })} /></label>
-                  <button onClick={() => onUpdateClip(selected.id, { voice: undefined })}>녹음 삭제</button>
-                </div>
-              )}
-              <ol className="voice-flow"><li><i>1</i>녹음 시작</li><li><i>2</i>내 설명 저장</li><li><i>3</i>영상과 함께 재생</li></ol>
             </div>
           )}
 
@@ -267,7 +245,7 @@ export const EditorScreen = ({
 
       {showAssistant && (
         <RetroWindow title="AI_EDIT_ASSISTANT.EXE" className="assistant-window" tools={<button onClick={() => setShowAssistant(false)}>×</button>}>
-            <p><b>이 장면을 어떻게 편집할까요?</b><br />장면 길이와 전환만 도와드려요. 내 녹음과 문구는 바꾸지 않아요.</p>
+            <p><b>이 장면을 어떻게 편집할까요?</b><br />장면 길이와 전환만 도와드려요. 내가 쓴 문구는 바꾸지 않아요.</p>
           <button onClick={() => { onUpdateClip(selected.id, { transition: 'FLASH' }); setShowAssistant(false) }}>첫 장면을 더 빠르게</button>
           <button onClick={() => { updatePopup({ enabled: true, message: 'ENERGY LEVEL: 4%' }); setShowAssistant(false) }}>상황에 맞는 팝업</button>
           <button onClick={() => { onUpdateClip(selected.id, { trimEnd: Math.min(selected.trimStart + 2.5, selected.duration) }); setShowAssistant(false) }}>이 장면을 더 짧게</button>

@@ -13,18 +13,21 @@ interface CreateProps {
   onFiles: (files: File[]) => Promise<void>
   onRemove: (clipId: string) => void
   onMove: (clipId: string, direction: -1 | 1) => void
+  onRetryThumbnail: (clipId: string) => Promise<void>
   onAnalyze: () => Promise<void>
 }
 
 const steps = ['테마 고르기', '영상 고르기', '꾸미고 저장']
 
 export const CreateScreen = ({
-  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onAnalyze,
+  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onRetryThumbnail, onAnalyze,
 }: CreateProps) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<1 | 2>(project.clips.length ? 2 : 1)
   const [chosenMode, setChosenMode] = useState<ProjectMode>()
   const [selectedId, setSelectedId] = useState<string>()
+  const [retryingId, setRetryingId] = useState<string>()
+  const [previewFailed, setPreviewFailed] = useState(false)
   const [dragging, setDragging] = useState(false)
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedId) ?? project.clips[0],
@@ -55,8 +58,18 @@ export const CreateScreen = ({
     setStep(2)
   }
 
+  const retryThumbnail = async (clipId: string) => {
+    setRetryingId(clipId)
+    setPreviewFailed(false)
+    try {
+      await onRetryThumbnail(clipId)
+    } finally {
+      setRetryingId(undefined)
+    }
+  }
+
   return (
-    <main className="screen create-screen create-quest">
+    <main className={`screen create-screen create-quest ${step === 1 ? 'create-quest--theme' : ''}`}>
       <nav className="quest-steps" aria-label="영상 만들기 단계">
         {steps.map((label, index) => {
           const number = index + 1
@@ -123,16 +136,18 @@ export const CreateScreen = ({
               </div>
               <div className="clip-review__content">
                 <div className="upload-preview">
-                  {selected?.mediaUrl && <video key={selected.id} src={selected.mediaUrl} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} />}
+                  {selected?.mediaUrl && !previewFailed && <video key={selected.id} src={selected.mediaUrl} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} onError={() => setPreviewFailed(true)} />}
+                  {selected && previewFailed && <button className="media-retry media-retry--preview" onClick={() => void retryThumbnail(selected.id)}><b>영상을 표시하지 못했어요</b><span>↻ 다시 불러오기</span></button>}
                   <span>{selected?.displayTime}</span><b>{selected?.activity || '장면 문구는 다음 단계에서 적어요'}</b>
                 </div>
                 <div className="thumbnail-grid" aria-label="업로드한 영상 목록">
                   {project.clips.map((clip, index) => (
                     <article key={clip.id} className={clip.id === selected?.id ? 'selected' : ''}>
-                      <button className="thumbnail-card" onClick={() => setSelectedId(clip.id)}>
-                        {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <span className="thumbnail-loading">미리보기 준비 중</span>}
+                      <button className="thumbnail-card" onClick={() => { setSelectedId(clip.id); setPreviewFailed(false) }}>
+                        {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <span className="thumbnail-loading">미리보기를 불러오지 못했어요</span>}
                         <i>{String(index + 1).padStart(2, '0')}</i><em>▶</em>
                       </button>
+                      {!clip.thumbnail && <button className="media-retry" disabled={retryingId === clip.id} onClick={() => void retryThumbnail(clip.id)}>{retryingId === clip.id ? '불러오는 중…' : '↻ 다시 불러오기'}</button>}
                       <div><b>{clip.name}</b><small>{clip.displayTime} 촬영 · {formatDuration(clip.duration)}</small><em>{clip.capturedAtSource === 'embedded-metadata' ? '원본 촬영정보' : '파일 날짜 기준'}</em></div>
                       <nav aria-label={`${clip.name} 순서 조절`}>
                         <button onClick={() => onMove(clip.id, -1)} disabled={index === 0}>←</button>
@@ -144,7 +159,7 @@ export const CreateScreen = ({
                 </div>
               </div>
               <div className="create-footer">
-                <p><i>✓</i><span><b>영상 선택 완료</b><small>다음 화면에서 썸네일, 문구, 내 목소리를 꾸며요.</small></span></p>
+                <p><i>✓</i><span><b>영상 선택 완료</b><small>다음 화면에서 썸네일, 문구와 자막을 꾸며요.</small></span></p>
                 <RetroButton className="primary-cta" onClick={() => void onAnalyze()}>꾸미기 시작 <span>→</span></RetroButton>
               </div>
             </section>

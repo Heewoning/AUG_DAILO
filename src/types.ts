@@ -11,7 +11,7 @@ export type ProjectMode =
   | 'CUSTOM'
 
 export type Mood = 'BUSY' | 'PRODUCTIVE' | 'TIRED' | 'HAPPY' | 'COZY' | 'CALM'
-export type EditorTab = 'COVER' | 'CLIP' | 'TEXT' | 'VOICE' | 'TRANSITION' | 'POPUP'
+export type EditorTab = 'COVER' | 'CLIP' | 'TEXT' | 'TRANSITION' | 'POPUP'
 export type Transition = 'AUTO' | 'HARD CUT' | 'FLASH' | 'BLACK SCREEN' | 'PHONE SCREEN' | 'WINDOW POP-UP'
 
 export interface VoiceTrack {
@@ -64,6 +64,7 @@ export interface DailoClip {
   displayTime: string
   activity: string
   activityEnglish?: string
+  activityEnglishEdited?: boolean
   activityIcon?: string
   caption: string
   mood: Mood

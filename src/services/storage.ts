@@ -177,7 +177,7 @@ const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoCl
   const presentation = activityTextProvider.present(metadata.activity || '')
   return {
     ...metadata,
-    activityEnglish: metadata.activityEnglish || presentation.english,
+    activityEnglish: metadata.activityEnglishEdited ? metadata.activityEnglish || presentation.english : presentation.english,
     activityIcon: metadata.activityIcon || presentation.icon,
     mediaUrl: videoBlob ? URL.createObjectURL(videoBlob) : '',
     videoBlob,
