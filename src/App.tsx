@@ -8,6 +8,7 @@ import { HomeScreen } from './screens/HomeScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { analysisProvider } from './services/analysis'
 import { createClipThumbnail, fileToClip } from './services/mediaMetadata'
+import { forgetSessionMedia, rememberSessionMedia, resolveSessionMedia } from './services/mediaSession'
 import { countRecordedSeconds, listProjects, loadProject, saveProject } from './services/storage'
 import { canRenderVideo, renderProject, type ExportProgress } from './services/videoExport'
 import { createProject, type AnalysisProgress, type AppView, type DailoClip, type DailoProject, type ProjectMode, type ProjectSummary } from './types'
@@ -134,6 +135,7 @@ function App() {
     setProject((current) => {
       const removed = current.clips.find((clip) => clip.id === clipId)
       if (removed?.mediaUrl) URL.revokeObjectURL(removed.mediaUrl)
+      forgetSessionMedia(clipId)
       return { ...current, clips: current.clips.filter((clip) => clip.id !== clipId) }
     })
     setSelectedClipId(undefined)
@@ -156,6 +158,8 @@ function App() {
     if (!previous) return
     try {
       const replacement = await fileToClip(file)
+      rememberSessionMedia(clipId, { mediaUrl: replacement.mediaUrl, videoBlob: replacement.videoBlob })
+      forgetSessionMedia(replacement.id)
       setProject((current) => ({
         ...current,
         clips: current.clips.map((item) => item.id === clipId ? {
@@ -182,7 +186,13 @@ function App() {
 
   const analyze = useCallback(async () => {
     if (!project.clips.length) return
-    const sourceProject = project
+    const sourceProject = {
+      ...project,
+      clips: project.clips.map((clip) => {
+        const media = resolveSessionMedia(clip)
+        return { ...clip, mediaUrl: media.mediaUrl, videoBlob: media.videoBlob }
+      }),
+    }
     setSelectedClipId(sourceProject.clips[0]?.id)
     setView('editor')
     setAnalysisProgress({ current: 0, total: project.clips.length, task: '분석 엔진 시작 중' })
@@ -192,6 +202,8 @@ function App() {
         ...organized,
         clips: organized.clips.map((clip) => ({
           ...clip,
+          mediaUrl: resolveSessionMedia(current.clips.find((item) => item.id === clip.id) ?? clip).mediaUrl,
+          videoBlob: resolveSessionMedia(current.clips.find((item) => item.id === clip.id) ?? clip).videoBlob,
           thumbnail: current.clips.find((item) => item.id === clip.id)?.thumbnail || clip.thumbnail,
         })),
       } : current)

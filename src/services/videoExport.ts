@@ -1,5 +1,6 @@
 import type { DailoClip, DailoProject } from '../types'
 import { activityTextProvider } from './activityText'
+import { resolveSessionMedia } from './mediaSession'
 
 export interface ExportProgress {
   percent: number
@@ -209,7 +210,10 @@ export const renderProject = async (
   safeMode = false,
 ): Promise<{ blob: Blob; extension: 'mp4' | 'webm'; skippedCount: number }> => {
   if (!canRenderVideo()) throw new Error('이 기기에서는 영상 합성을 지원하지 않아요. 최신 Safari 또는 Chrome으로 열어주세요.')
-  const clips = project.clips.filter((clip) => clip.videoBlob || clip.mediaUrl)
+  const clips = project.clips.filter((clip) => {
+    const media = resolveSessionMedia(clip)
+    return media.videoBlob || media.mediaUrl
+  })
   if (!clips.length) throw new Error('저장할 영상 클립이 없어요.')
 
   const isMobile = window.matchMedia('(max-width: 900px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent)
@@ -236,11 +240,13 @@ export const renderProject = async (
   const temporaryUrls = new Set<string>()
   const clipSources = new Map<string, string>()
   const sourceFor = (clip: DailoClip, refresh = false) => {
-    if (!clip.videoBlob) return clip.mediaUrl
+    const media = resolveSessionMedia(clip)
+    if (!refresh && media.mediaUrl) return media.mediaUrl
+    if (!media.videoBlob) return media.mediaUrl
     const current = clipSources.get(clip.id)
     if (current && !refresh) return current
     if (current) { URL.revokeObjectURL(current); temporaryUrls.delete(current) }
-    const url = URL.createObjectURL(clip.videoBlob)
+    const url = URL.createObjectURL(media.videoBlob)
     temporaryUrls.add(url)
     clipSources.set(clip.id, url)
     return url
@@ -257,7 +263,7 @@ export const renderProject = async (
     try {
       await load()
     } catch (error) {
-      if (!clip.videoBlob) throw error
+      if (!resolveSessionMedia(clip).videoBlob) throw error
       await load(true)
     }
   }

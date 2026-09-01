@@ -1,4 +1,5 @@
 import { makeId, type DailoClip } from '../types'
+import { rememberSessionMedia } from './mediaSession'
 
 const formatCapturedTime = (date: Date) =>
   `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -146,7 +147,7 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
   video.removeAttribute('src')
   video.load()
 
-  return {
+  const clip: DailoClip = {
     id: makeId(),
     name: file.name,
     mediaUrl,
@@ -175,6 +176,8 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
       button: 'OK',
     },
   }
+  rememberSessionMedia(clip.id, { mediaUrl: clip.mediaUrl, videoBlob: clip.videoBlob })
+  return clip
 }
 
 export const formatDuration = (seconds: number) => {

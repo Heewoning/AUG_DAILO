@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { moods, popupSuggestions } from '../data'
 import { formatDuration } from '../services/mediaMetadata'
 import { activityTextProvider } from '../services/activityText'
+import { resolveSessionMedia } from '../services/mediaSession'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
 import type { DailoClip, DailoProject, EditorTab, Transition } from '../types'
 
@@ -29,15 +30,20 @@ const tabLabels: Record<EditorTab, string> = {
   COVER: '썸네일', CLIP: '장면', TEXT: '자막', TRANSITION: '전환', POPUP: '말풍선',
 }
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
-const previewMediaUrls = new WeakMap<Blob, string>()
+const previewBlobUrls = new WeakMap<Blob, string>()
 
-const previewSourceFor = (clip: DailoClip) => {
-  if (!clip.videoBlob) return clip.mediaUrl
-  const existing = previewMediaUrls.get(clip.videoBlob)
-  if (existing) return existing
-  const source = URL.createObjectURL(clip.videoBlob)
-  previewMediaUrls.set(clip.videoBlob, source)
-  return source
+const previewSourcesFor = (clip: DailoClip) => {
+  const media = resolveSessionMedia(clip)
+  const sources = media.mediaUrl ? [media.mediaUrl] : []
+  if (media.videoBlob) {
+    let blobUrl = previewBlobUrls.get(media.videoBlob)
+    if (!blobUrl) {
+      blobUrl = URL.createObjectURL(media.videoBlob)
+      previewBlobUrls.set(media.videoBlob, blobUrl)
+    }
+    if (!sources.includes(blobUrl)) sources.push(blobUrl)
+  }
+  return sources
 }
 
 interface LiveClipVideoProps {
@@ -49,12 +55,14 @@ interface LiveClipVideoProps {
 }
 
 const LiveClipVideo = forwardRef<HTMLVideoElement, LiveClipVideoProps>(({ clip, poster, onError, onEnded, onTimeUpdate }, ref) => {
-  const source = useMemo(
-    () => previewSourceFor(clip),
+  const sources = useMemo(
+    () => previewSourcesFor(clip),
     [clip],
   )
+  const [sourceIndex, setSourceIndex] = useState(0)
+  const source = sources[Math.min(sourceIndex, Math.max(sources.length - 1, 0))]
 
-  return <video ref={ref} src={source} poster={poster} controls playsInline preload="metadata" onError={onError} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
+  return <video ref={ref} src={source} poster={poster} controls playsInline preload="metadata" onError={() => sourceIndex + 1 < sources.length ? setSourceIndex(sourceIndex + 1) : onError()} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
 })
 
 LiveClipVideo.displayName = 'LiveClipVideo'
@@ -123,6 +131,8 @@ export const EditorScreen = ({
   const selectedPresentation = presentationFor(selected)
   const previewClip = tab === 'COVER' ? project.clips[coverMontageIndex % project.clips.length] ?? project.clips[0] : selected
   const activePreviewClip = previewAll ? project.clips[previewIndex] ?? selected : previewClip
+  const activePreviewMedia = resolveSessionMedia(activePreviewClip)
+  const activePreviewMissing = !activePreviewMedia.mediaUrl && !activePreviewMedia.videoBlob
   const previewPresentation = presentationFor(activePreviewClip)
   const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
   const coverTitleLength = Array.from(project.coverTitle.replace(/\s/g, '')).length || 1
@@ -190,8 +200,8 @@ export const EditorScreen = ({
         <section className="preview-column">
           <div className="preview-label"><span>실시간 미리보기 · 9:16</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
           <div className="phone-preview">
-            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && <LiveClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
-            {previewFailed && <div className="media-recovery-panel editor-media-retry"><b>원본 영상이 필요해요</b><p>같은 파일을 다시 골라 주세요.<br />작성한 문구는 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>클립 삭제</button></div>}
+            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <LiveClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+            {(previewFailed || activePreviewMissing) && <div className="media-recovery-panel editor-media-retry"><b>원본 영상이 필요해요</b><p>같은 파일을 다시 골라 주세요.<br />작성한 문구는 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>클립 삭제</button></div>}
             <div className="video-gradient" />
             {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
             {tab === 'COVER' ? (
