@@ -11,6 +11,7 @@ type CaptureCanvas = HTMLCanvasElement & { captureStream(frameRate?: number): Me
 type FrameTrack = MediaStreamTrack & { requestFrame?: () => void }
 
 const delay = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+const SCENE_OVERLAY_SECONDS = 0.3
 
 const waitForMedia = (target: EventTarget, eventName: string, timeout = 15_000) =>
   new Promise<void>((resolve, reject) => {
@@ -356,7 +357,8 @@ export const renderProject = async (
           context.fillStyle = '#111'
           context.fillRect(0, 0, canvas.width, canvas.height)
           drawCoveredVideo(context, video, canvas.width, canvas.height)
-          drawClipBubble(context, clip, canvas.width, canvas.height)
+          const elapsedOutputSeconds = Math.max(video.currentTime - startAt, 0) / clip.speed
+          if (elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS) drawClipBubble(context, clip, canvas.width, canvas.height)
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({

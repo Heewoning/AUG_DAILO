@@ -76,6 +76,16 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await page.getByLabel('선택한 클립 문구').fill('다이소 출근')
   await expect(page.getByText('Going to work at Daiso', { exact: true })).toBeVisible()
   await expect(page.locator('.reference-scene-overlay')).toContainText('Going to work at Daiso')
+  if ((page.viewportSize()?.width ?? 1000) <= 600) {
+    expect(await page.locator('.reference-scene-overlay time').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(28)
+    const previewBox = await page.locator('.preview-column').boundingBox()
+    const inspectorBox = await page.locator('.inspector').boundingBox()
+    const clipStripBox = await page.locator('.clip-sidebar').boundingBox()
+    expect(previewBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
+    expect(inspectorBox?.y).toBeLessThan(clipStripBox?.y ?? 0)
+  }
+  await page.waitForTimeout(350)
+  await expect(page.locator('.reference-scene-overlay')).toBeHidden()
   await expect(page.getByRole('button', { name: /설명 녹음/ })).toHaveCount(0)
   await page.getByLabel('선택한 클립 문구').fill('머리핀을 꽂았어요❤️')
   await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)

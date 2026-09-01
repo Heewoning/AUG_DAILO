@@ -1,6 +1,7 @@
 export interface ActivityTextProvider {
   readonly id: string
   present(text: string): { english: string; icon: string }
+  translate(text: string): Promise<{ english: string; icon: string; source: 'local' | 'browser' | 'unavailable' }>
 }
 
 type Presentation = { english: string; icon: string }
@@ -20,6 +21,9 @@ const exactTranslations: Record<string, Presentation> = {
   '춤을춰요': { english: "I'm dancing", icon: '💗' },
   '춤을 춰요': { english: "I'm dancing", icon: '💗' },
   '춤춰요': { english: "I'm dancing", icon: '💗' },
+  '춤추고있어': { english: "I'm dancing", icon: '💗' },
+  '춤추고 있어': { english: "I'm dancing", icon: '💗' },
+  '춤추는 중': { english: "I'm dancing", icon: '💗' },
   '아침 운동': { english: 'Morning workout', icon: '🏃‍♀️' },
   '저녁 운동': { english: 'Evening workout', icon: '🏃‍♀️' },
   '공부': { english: 'Study session', icon: '📚' },
@@ -150,6 +154,11 @@ const sentenceTranslation = (text: string): string | undefined => {
     { pattern: /촬영|콘텐츠|편집|브이로그/, english: 'Creating content' },
     { pattern: /쇼핑|마트|다이소/, english: 'Shopping time' },
     { pattern: /산책/, english: 'Taking a walk' },
+    { pattern: /춤/, english: "I'm dancing" },
+    { pattern: /노래/, english: "I'm singing" },
+    { pattern: /웃고|웃는/, english: 'Smiling' },
+    { pattern: /놀고|노는/, english: 'Having fun' },
+    { pattern: /준비/, english: 'Getting ready' },
     { pattern: /잠|수면|취침/, english: 'Time to rest' },
     { pattern: /집|귀가/, english: 'Going home' },
   ]
@@ -168,6 +177,29 @@ class LocalKoreanActivityProvider implements ActivityTextProvider {
     const icon = exact?.icon ?? iconRules.find(({ pattern }) => pattern.test(normalized))?.icon ?? '✦'
     const english = exact?.english ?? sentenceTranslation(normalized) ?? ''
     return { english: `${english}${emoji ? ` ${emoji}` : ''}`, icon }
+  }
+
+  async translate(text: string) {
+    const local = this.present(text)
+    if (local.english || !/[가-힣]/.test(text)) return { ...local, source: 'local' as const }
+
+    type BrowserTranslator = { translate(value: string): Promise<string> }
+    type BrowserTranslatorFactory = {
+      availability(options: { sourceLanguage: string; targetLanguage: string }): Promise<string>
+      create(options: { sourceLanguage: string; targetLanguage: string }): Promise<BrowserTranslator>
+    }
+    const factory = (globalThis as typeof globalThis & { Translator?: BrowserTranslatorFactory }).Translator
+    if (!factory) return { ...local, source: 'unavailable' as const }
+
+    try {
+      const options = { sourceLanguage: 'ko', targetLanguage: 'en' }
+      if (await factory.availability(options) === 'unavailable') return { ...local, source: 'unavailable' as const }
+      const translator = await factory.create(options)
+      const english = (await translator.translate(text)).trim()
+      return english ? { english, icon: local.icon, source: 'browser' as const } : { ...local, source: 'unavailable' as const }
+    } catch {
+      return { ...local, source: 'unavailable' as const }
+    }
   }
 }
 

@@ -51,10 +51,11 @@ interface LiveClipVideoProps {
   poster?: string
   onError: () => void
   onEnded: () => void
+  onPlay: () => void
   onTimeUpdate: (video: HTMLVideoElement) => void
 }
 
-const LiveClipVideo = forwardRef<HTMLVideoElement, LiveClipVideoProps>(({ clip, poster, onError, onEnded, onTimeUpdate }, ref) => {
+const LiveClipVideo = forwardRef<HTMLVideoElement, LiveClipVideoProps>(({ clip, poster, onError, onEnded, onPlay, onTimeUpdate }, ref) => {
   const sources = useMemo(
     () => previewSourcesFor(clip),
     [clip],
@@ -62,7 +63,7 @@ const LiveClipVideo = forwardRef<HTMLVideoElement, LiveClipVideoProps>(({ clip, 
   const [sourceIndex, setSourceIndex] = useState(0)
   const source = sources[Math.min(sourceIndex, Math.max(sources.length - 1, 0))]
 
-  return <video ref={ref} src={source} poster={poster} controls playsInline preload="metadata" onError={() => sourceIndex + 1 < sources.length ? setSourceIndex(sourceIndex + 1) : onError()} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
+  return <video ref={ref} src={source} poster={poster} playsInline preload="metadata" aria-label={`${clip.name} 장면 미리보기`} title="영상을 눌러 재생하거나 멈출 수 있어요" onClick={(event) => event.currentTarget.paused ? void event.currentTarget.play().catch(() => undefined) : event.currentTarget.pause()} onPlay={onPlay} onError={() => sourceIndex + 1 < sources.length ? setSourceIndex(sourceIndex + 1) : onError()} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
 })
 
 LiveClipVideo.displayName = 'LiveClipVideo'
@@ -77,6 +78,9 @@ export const EditorScreen = ({
   const [previewIndex, setPreviewIndex] = useState(0)
   const [coverMontageIndex, setCoverMontageIndex] = useState(0)
   const [previewFailed, setPreviewFailed] = useState(false)
+  const [sceneOverlayVersion, setSceneOverlayVersion] = useState(0)
+  const [translating, setTranslating] = useState(false)
+  const [translationNotice, setTranslationNotice] = useState<string>()
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const selected = useMemo(
     () => project.clips.find((clip) => clip.id === selectedClipId) ?? project.clips[0],
@@ -109,7 +113,30 @@ export const EditorScreen = ({
 
   const updateActivity = (clip: DailoClip, activity: string) => {
     const presentation = activityTextProvider.present(activity)
+    setTranslationNotice(undefined)
     onUpdateClip(clip.id, { activity, activityEnglish: presentation.english, activityEnglishEdited: false, activityIcon: presentation.icon })
+  }
+
+  const translateSelectedActivity = async () => {
+    if (!selected.activity.trim() || translating) return
+    setTranslationNotice(undefined)
+
+    const local = activityTextProvider.present(selected.activity)
+    if (local.english) {
+      onUpdateClip(selected.id, { activityEnglish: local.english, activityEnglishEdited: true, activityIcon: local.icon })
+      setTranslationNotice('자주 쓰는 표현으로 번역했어요.')
+      return
+    }
+
+    setTranslating(true)
+    const result = await activityTextProvider.translate(selected.activity)
+    if (result.english) {
+      onUpdateClip(selected.id, { activityEnglish: result.english, activityEnglishEdited: true, activityIcon: result.icon })
+      setTranslationNotice(result.source === 'browser' ? '기기 내 번역으로 완성했어요.' : '자주 쓰는 표현으로 번역했어요.')
+    } else {
+      setTranslationNotice('이 기기에서는 해당 문장의 자동 번역을 지원하지 않아요. 영문을 직접 입력해 주세요.')
+    }
+    setTranslating(false)
   }
 
   const replaceMedia = async (input: HTMLInputElement) => {
@@ -198,9 +225,9 @@ export const EditorScreen = ({
         </aside>
 
         <section className="preview-column">
-          <div className="preview-label"><span>실시간 미리보기 · 9:16</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
+          <div className="preview-label"><span>9:16 · 영상을 눌러 재생</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
           <div className="phone-preview">
-            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <LiveClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <LiveClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onPlay={() => setSceneOverlayVersion((version) => version + 1)} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
             {(previewFailed || activePreviewMissing) && <div className="media-recovery-panel editor-media-retry"><b>원본 영상이 필요해요</b><p>같은 파일을 다시 골라 주세요.<br />작성한 문구는 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>클립 삭제</button></div>}
             <div className="video-gradient" />
             {tab === 'COVER' && <div className="reels-safe-guide"><span>REELS SAFE AREA</span></div>}
@@ -212,7 +239,7 @@ export const EditorScreen = ({
                 <p>{coverEnglish}</p>
               </div>
             ) : (
-              <div className="reference-scene-overlay">
+              <div key={`${activePreviewClip.id}-${activePreviewClip.displayTime}-${activePreviewClip.activity}-${previewPresentation.english}-${sceneOverlayVersion}`} className="reference-scene-overlay scene-overlay-flash">
                 <span className="xp-scene-tag"><i>{activePreviewClip.activityIcon || previewPresentation.icon}</i><em>CLIP_INFO.EXE</em><b>×</b></span>
                 <time>{activePreviewClip.displayTime}</time>
                 <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
@@ -254,7 +281,7 @@ export const EditorScreen = ({
             <div className="inspector-panel">
               <label>촬영 시간 <span>AUTO</span><input aria-label="선택한 클립 시간" value={selected.displayTime} onChange={(event) => onUpdateClip(selected.id, { displayTime: event.target.value })} /><small className="field-help">영상 선택 시 촬영 정보와 자동 연동돼요.</small></label>
               <label>장면 문구<input aria-label="선택한 클립 문구" value={selected.activity} placeholder="예: 다이소 출근" onChange={(event) => updateActivity(selected, event.target.value)} /></label>
-              <div className="translation-preview translation-editor"><i>{selectedPresentation.icon}</i><label><small>ENGLISH · 지우거나 직접 수정할 수 있어요</small><input aria-label="영어 자막" value={selectedPresentation.english} placeholder="영문 자막 (선택)" onChange={(event) => onUpdateClip(selected.id, { activityEnglish: event.target.value, activityEnglishEdited: true })} /></label>{selected.activityEnglishEdited && <button onClick={() => onUpdateClip(selected.id, { activityEnglish: activityTextProvider.present(selected.activity).english, activityEnglishEdited: false })}>자동 번역</button>}</div>
+              <div className="translation-preview translation-editor"><i>{selectedPresentation.icon}</i><label><small>ENGLISH · 자동 번역 또는 직접 입력</small><input aria-label="영어 자막" value={selectedPresentation.english} placeholder="영문 자막 (선택)" onChange={(event) => { setTranslationNotice(undefined); onUpdateClip(selected.id, { activityEnglish: event.target.value, activityEnglishEdited: true }) }} /></label><button disabled={!selected.activity.trim() || translating} onClick={() => void translateSelectedActivity()}>{translating ? '번역 중...' : '자동 번역'}</button>{translationNotice && <small className="translation-notice">{translationNotice}</small>}</div>
               <details className="advanced-tools">
                 <summary>상세 편집 열기</summary>
                 <div className="field-row"><label>시작 위치<input type="number" min="0" max={selected.trimEnd} step="0.1" value={selected.trimStart} onChange={(event) => onUpdateClip(selected.id, { trimStart: Number(event.target.value) })} /></label><label>끝 위치<input type="number" min={selected.trimStart} max={selected.duration} step="0.1" value={selected.trimEnd.toFixed(1)} onChange={(event) => onUpdateClip(selected.id, { trimEnd: Number(event.target.value) })} /></label></div>
