@@ -88,6 +88,7 @@ function App() {
   const onFiles = useCallback(async (files: File[]) => {
     setLoadingFiles(true)
     try {
+      void navigator.storage?.persist?.().catch(() => false)
       let loadedCount = 0
       const thumbnailQueue: DailoClip[] = []
       for (let index = 0; index < files.length; index += 2) {

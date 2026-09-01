@@ -102,7 +102,7 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   })
   const englishSize = Math.round(width * 0.03)
   context.font = `500 ${englishSize}px Tahoma, Arial, sans-serif`
-  const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish || presentation.english : presentation.english, width * .78)
+  const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish ?? '' : presentation.english, width * .78)
   const englishY = koreanStartY + koreanLines.length * koreanSize * .96 + englishSize * .45
   context.strokeText(english, width / 2, englishY)
   context.fillText(english, width / 2, englishY)
@@ -161,7 +161,7 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.fillStyle = '#fff'
   context.textAlign = 'center'
   context.font = `700 ${Math.round(width * 0.026)}px Tahoma, sans-serif`
-  context.fillText(`${presentation.icon}  DAY_IN_LIFE.EXE   ×`, safeCenterX, tagY + width * .045)
+  context.fillText(fitText(context, `${presentation.icon}  DAY_IN_LIFE.EXE   ×`, tagWidth - width * .04), safeCenterX, tagY + width * .045)
   context.fillStyle = '#fff1a8'
   context.font = `800 ${Math.round(width * 0.025)}px Tahoma, sans-serif`
   context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', safeCenterX, tagY + width * .12)
@@ -209,7 +209,7 @@ export const renderProject = async (
   safeMode = false,
 ): Promise<{ blob: Blob; extension: 'mp4' | 'webm'; skippedCount: number }> => {
   if (!canRenderVideo()) throw new Error('이 기기에서는 영상 합성을 지원하지 않아요. 최신 Safari 또는 Chrome으로 열어주세요.')
-  const clips = project.clips.filter((clip) => clip.mediaUrl)
+  const clips = project.clips.filter((clip) => clip.videoBlob || clip.mediaUrl)
   if (!clips.length) throw new Error('저장할 영상 클립이 없어요.')
 
   const isMobile = window.matchMedia('(max-width: 900px)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent)

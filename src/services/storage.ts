@@ -6,6 +6,8 @@ const DATABASE = 'dailo-media-v1'
 const STORE = 'blobs'
 const persistedVoiceVersions = new Map<string, string>()
 const persistedExportVersions = new Map<string, string>()
+const persistedVideoVersions = new Map<string, Blob>()
+const pendingVideoWrites = new Map<string, { blob: Blob; promise: Promise<void> }>()
 
 type StoredVoice = Omit<VoiceTrack, 'blob' | 'url'> & { hasBlob: boolean }
 type StoredClip = Omit<DailoClip, 'mediaUrl' | 'videoBlob' | 'voice'> & {
@@ -52,6 +54,20 @@ const getBlob = async (key: string) => {
   })
   database.close()
   return blob
+}
+
+const persistVideoBlob = (key: string, blob: Blob) => {
+  if (persistedVideoVersions.get(key) === blob) return Promise.resolve()
+  const pending = pendingVideoWrites.get(key)
+  if (pending?.blob === blob) return pending.promise
+  const write = (pending?.promise.catch(() => undefined) ?? Promise.resolve())
+    .then(() => putBlob(key, blob, true))
+    .then(() => { persistedVideoVersions.set(key, blob) })
+    .finally(() => {
+      if (pendingVideoWrites.get(key)?.blob === blob) pendingVideoWrites.delete(key)
+    })
+  pendingVideoWrites.set(key, { blob, promise: write })
+  return write
 }
 
 const normalizeStoredClip = (value: unknown, index: number): StoredClip | undefined => {
@@ -150,11 +166,10 @@ export const saveProject = async (project: DailoProject) => {
     } : undefined,
   }
   const projects = readAll().filter((item) => item.id !== project.id)
-  localStorage.setItem(PROJECT_KEY, JSON.stringify([stored, ...projects].slice(0, 30)))
 
   await Promise.all(project.clips.flatMap((clip) => {
     const writes: Promise<void>[] = []
-    if (clip.videoBlob) writes.push(putBlob(`${project.id}:${clip.id}:video`, clip.videoBlob))
+    if (clip.videoBlob) writes.push(persistVideoBlob(`${project.id}:${clip.id}:video`, clip.videoBlob))
     const voiceKey = `${project.id}:${clip.id}:voice`
     if (clip.voice?.blob && persistedVoiceVersions.get(voiceKey) !== clip.voice.createdAt) {
       writes.push(putBlob(voiceKey, clip.voice.blob, true).then(() => {
@@ -168,6 +183,7 @@ export const saveProject = async (project: DailoProject) => {
     await putBlob(exportKey, exportAsset.blob, true)
     persistedExportVersions.set(exportKey, exportAsset.createdAt)
   }
+  localStorage.setItem(PROJECT_KEY, JSON.stringify([stored, ...projects].slice(0, 30)))
 }
 
 const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoClip> => {
@@ -177,7 +193,7 @@ const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoCl
   const presentation = activityTextProvider.present(metadata.activity || '')
   return {
     ...metadata,
-    activityEnglish: metadata.activityEnglishEdited ? metadata.activityEnglish || presentation.english : presentation.english,
+    activityEnglish: metadata.activityEnglishEdited ? metadata.activityEnglish ?? '' : presentation.english,
     activityIcon: metadata.activityIcon || presentation.icon,
     mediaUrl: videoBlob ? URL.createObjectURL(videoBlob) : '',
     videoBlob,

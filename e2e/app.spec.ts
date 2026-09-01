@@ -77,6 +77,13 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await expect(page.getByRole('button', { name: /설명 녹음/ })).toHaveCount(0)
   await page.getByLabel('선택한 클립 문구').fill('머리핀을 꽂았어요❤️')
   await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)
+  await page.getByLabel('영어 자막').fill('')
+  await expect(page.getByLabel('영어 자막')).toHaveValue('')
+  await expect(page.locator('.reference-scene-overlay > small')).toHaveText('')
+  await page.getByRole('button', { name: '자동 번역' }).click()
+  await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)
+  await expect.poll(() => page.locator('.phone-preview video').evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)
+  await expect(page.locator('.editor-media-retry')).toHaveCount(0)
 
   await page.getByRole('button', { name: /영상 만들기/ }).click()
   await expect(page.getByText('오늘의 영상이 완성됐어요')).toBeVisible({ timeout: 90_000 })

@@ -12,5 +12,7 @@ describe('activityTextProvider', () => {
     expect(activityTextProvider.present('서진이랑 놀았어요')).toEqual({ english: 'I had fun with Seojin', icon: '💗' })
     expect(activityTextProvider.present('머리핀이 너무 좋아요')).toEqual({ english: 'I really love my hair clip', icon: '🎀' })
     expect(activityTextProvider.present('춤추는 서진이❤️')).toEqual({ english: 'Seojin is dancing ❤', icon: '💗' })
+    expect(activityTextProvider.present('춤을춰요')).toEqual({ english: "I'm dancing", icon: '💗' })
+    expect(activityTextProvider.present('알 수 없는 문장')).toEqual({ english: '', icon: '✦' })
   })
 })

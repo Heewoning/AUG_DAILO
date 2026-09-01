@@ -17,6 +17,9 @@ const exactTranslations: Record<string, Presentation> = {
   '점심': { english: 'Lunch break', icon: '🍴' },
   '저녁': { english: 'Dinner time', icon: '🍽️' },
   '운동': { english: 'Workout time', icon: '🏃‍♀️' },
+  '춤을춰요': { english: "I'm dancing", icon: '💗' },
+  '춤을 춰요': { english: "I'm dancing", icon: '💗' },
+  '춤춰요': { english: "I'm dancing", icon: '💗' },
   '아침 운동': { english: 'Morning workout', icon: '🏃‍♀️' },
   '저녁 운동': { english: 'Evening workout', icon: '🏃‍♀️' },
   '공부': { english: 'Study session', icon: '📚' },
@@ -77,7 +80,7 @@ const translateLocation = (value: string) => locations[value.trim()] ?? nameInEn
 
 const iconRules: Array<{ pattern: RegExp; icon: string }> = [
   { pattern: /머리|핀|화장|옷|신발/, icon: '🎀' },
-  { pattern: /아이|친구|함께|놀|이랑|의 하루|춤추는|춤춰/, icon: '💗' },
+  { pattern: /아이|친구|함께|놀|이랑|의 하루|춤/, icon: '💗' },
   { pattern: /출근|회사|오피스/, icon: '💼' },
   { pattern: /카페|커피|라떼/, icon: '☕' },
   { pattern: /아침|기상|일어나/, icon: '☀️' },
@@ -98,6 +101,8 @@ const sentenceTranslation = (text: string): string | undefined => {
 
   match = text.match(/^(.+?)(?:이|가)\s*(?:춤춰요|춤췄어요|춤추고 있어요)$/)
   if (match) return `${nameInEnglish(match[1])} is dancing`
+
+  if (/^춤(?:을)?\s*(?:춰요|췄어요|추고 있어요)$/.test(text)) return "I'm dancing"
 
   match = text.match(/^(.+?)(?:이|가)\s*너무\s*(좋아요|예뻐요|귀여워요)$/)
   if (match) {
@@ -157,11 +162,11 @@ class LocalKoreanActivityProvider implements ActivityTextProvider {
   present(text: string): Presentation {
     const emoji = text.match(/\p{Extended_Pictographic}/gu)?.join(' ') ?? ''
     const normalized = text.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/gu, '').trim()
-    if (!normalized) return { english: 'Write your moment', icon: '✦' }
+    if (!normalized) return { english: '', icon: '✦' }
     if (!/[가-힣]/.test(normalized)) return { english: text.trim(), icon: '✦' }
     const exact = exactTranslations[normalized]
     const icon = exact?.icon ?? iconRules.find(({ pattern }) => pattern.test(normalized))?.icon ?? '✦'
-    const english = exact?.english ?? sentenceTranslation(normalized) ?? 'Add your English caption'
+    const english = exact?.english ?? sentenceTranslation(normalized) ?? ''
     return { english: `${english}${emoji ? ` ${emoji}` : ''}`, icon }
   }
 }
