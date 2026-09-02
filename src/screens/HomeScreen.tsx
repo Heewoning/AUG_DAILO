@@ -27,6 +27,9 @@ export const HomeScreen = ({ projects, onCreate, onOpenProject }: HomeProps) => 
           <p className="hero-kicker">어려운 편집은 필요 없어요.<br />한 단계씩 따라오면 영상이 완성돼요.</p>
           <RetroButton className="primary-cta" onClick={onCreate}>영상 만들기 시작 <span>→</span></RetroButton>
           <ol className="home-mini-steps"><li><i>1</i>테마</li><li><i>2</i>영상</li><li><i>3</i>꾸미기</li><li><i>4</i>저장</li></ol>
+          <button className="mobile-continue-day" disabled={!recent} onClick={() => recent && onOpenProject(recent.id)}>
+            <i>▣</i><span><b>지난 영상 이어서</b><small>{recent ? `${recent.title} · ${recent.clipCount}개 클립` : '아직 이어서 만들 영상이 없어요'}</small></span><em>→</em>
+          </button>
         </div>
 
         <div className="simple-hero-window">
@@ -39,7 +42,7 @@ export const HomeScreen = ({ projects, onCreate, onOpenProject }: HomeProps) => 
 
       {recent && (
         <section className="continue-day">
-          <div><span>CONTINUE</span><b>만들던 영상이 있어요</b><small>{new Date(recent.updatedAt).toLocaleDateString('ko-KR')} · {recent.clipCount}개 클립</small></div>
+          <div><span>CONTINUE</span><b>지난 영상 이어서</b><small>{new Date(recent.updatedAt).toLocaleDateString('ko-KR')} · {recent.clipCount}개 클립</small></div>
           <RetroButton onClick={() => onOpenProject(recent.id)}>이어 만들기</RetroButton>
         </section>
       )}

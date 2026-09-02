@@ -114,6 +114,7 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
 test('mobile home keeps the primary action and navigation reachable', async ({ page }) => {
   await page.goto('./')
   await expect(page.getByRole('button', { name: /영상 만들기 시작/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /지난 영상 이어서/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '주요 메뉴' })).toBeVisible()
   expect(await page.evaluate(() => window.innerWidth > 600 || document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true)
   await page.getByRole('button', { name: /영상 만들기 시작/ }).click()
