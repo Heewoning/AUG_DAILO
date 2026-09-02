@@ -7,7 +7,7 @@ import { EditorScreen } from './screens/EditorScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { analysisProvider } from './services/analysis'
-import { createClipThumbnail, fileToClip } from './services/mediaMetadata'
+import { createClipThumbnail, createFileSourceKey, fileToClip } from './services/mediaMetadata'
 import { forgetSessionMedia, rememberSessionMedia, resolveSessionMedia } from './services/mediaSession'
 import { countRecordedSeconds, listProjects, loadProject, saveProject } from './services/storage'
 import { canRenderVideo, renderProject, type ExportProgress } from './services/videoExport'
@@ -99,10 +99,28 @@ function App() {
     setLoadingFiles(true)
     try {
       void navigator.storage?.persist?.().catch(() => false)
+      const knownSourceKeys = new Set(project.clips.flatMap((clip) => {
+        if (clip.sourceKey) return [clip.sourceKey]
+        return clip.videoBlob instanceof File ? [createFileSourceKey(clip.videoBlob)] : []
+      }))
+      let duplicateCount = 0
+      const uniqueFiles = files.filter((file) => {
+        const sourceKey = createFileSourceKey(file)
+        if (knownSourceKeys.has(sourceKey)) {
+          duplicateCount += 1
+          return false
+        }
+        knownSourceKeys.add(sourceKey)
+        return true
+      })
+      if (!uniqueFiles.length) {
+        setToast('이미 선택한 영상이에요. 중복 영상은 추가하지 않았어요.')
+        return
+      }
       let loadedCount = 0
       const thumbnailQueue: DailoClip[] = []
-      for (let index = 0; index < files.length; index += 2) {
-        const results = await Promise.allSettled(files.slice(index, index + 2).map((file) => fileToClip(file, { thumbnail: false })))
+      for (let index = 0; index < uniqueFiles.length; index += 2) {
+        const results = await Promise.allSettled(uniqueFiles.slice(index, index + 2).map((file) => fileToClip(file, { thumbnail: false })))
         const batch = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
           .sort((first, second) => new Date(first.capturedAt).getTime() - new Date(second.capturedAt).getTime())
         if (!batch.length) continue
@@ -119,7 +137,9 @@ function App() {
         setLoadingFiles(false)
       }
       if (!loadedCount) throw new Error('선택한 영상을 읽지 못했어요. 다른 파일로 다시 시도해 주세요.')
-      setToast(`${loadedCount}개의 영상을 바로 불러왔어요.`)
+      setToast(duplicateCount
+        ? `${loadedCount}개를 불러오고, 중복 영상 ${duplicateCount}개는 제외했어요.`
+        : `${loadedCount}개의 영상을 바로 불러왔어요.`)
       void (async () => {
         for (const clip of thumbnailQueue) {
           try {
@@ -138,7 +158,7 @@ function App() {
     } finally {
       setLoadingFiles(false)
     }
-  }, [])
+  }, [project.clips])
 
   const removeClip = useCallback((clipId: string) => {
     setProject((current) => {
@@ -165,6 +185,11 @@ function App() {
   const replaceClipSource = useCallback(async (clipId: string, file: File) => {
     const previous = project.clips.find((item) => item.id === clipId)
     if (!previous) return
+    const sourceKey = createFileSourceKey(file)
+    if (project.clips.some((item) => item.id !== clipId && item.sourceKey === sourceKey)) {
+      setToast('이미 다른 장면에 선택한 영상이에요.')
+      return
+    }
     try {
       const replacement = await fileToClip(file)
       rememberSessionMedia(clipId, { mediaUrl: replacement.mediaUrl, videoBlob: replacement.videoBlob })
@@ -174,6 +199,7 @@ function App() {
         clips: current.clips.map((item) => item.id === clipId ? {
           ...item,
           name: replacement.name,
+          sourceKey: replacement.sourceKey,
           mediaUrl: replacement.mediaUrl,
           videoBlob: replacement.videoBlob,
           thumbnail: replacement.thumbnail,

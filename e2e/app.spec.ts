@@ -64,6 +64,13 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   })
   await expect(page.getByAltText('morning-coffee.webm 대표 장면')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByLabel('morning-coffee.webm 미리보기')).toBeVisible()
+  await page.locator('.drop-zone input[type=file]').setInputFiles({
+    name: 'morning-coffee.webm',
+    mimeType: 'video/webm',
+    buffer: Buffer.from(videoBytes),
+  })
+  await expect(page.getByText(/중복 영상은 추가하지 않았어요/)).toBeVisible()
+  await expect(page.locator('.thumbnail-grid article')).toHaveCount(1)
   await page.getByRole('button', { name: /꾸미기 시작/ }).click()
   await expect(page.getByText('MY_DAY_IS_RUNNING.EXE')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('USER VOICE ONLY')).toHaveCount(0)
@@ -82,16 +89,21 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
     const inspectorBox = await page.locator('.inspector').boundingBox()
     const clipStripBox = await page.locator('.clip-sidebar').boundingBox()
     expect(previewBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
-    expect(inspectorBox?.y).toBeLessThan(clipStripBox?.y ?? 0)
+    expect(clipStripBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
+    expect(previewBox?.height).toBeGreaterThanOrEqual(270)
+    await expect(page.locator('.editor-quest-bar')).toBeHidden()
+    await expect(page.locator('.app-shell--editor .bottom-nav')).toBeHidden()
   }
   await page.waitForTimeout(350)
-  await expect(page.locator('.reference-scene-overlay')).toBeHidden()
+  await expect(page.locator('.xp-scene-tag')).toBeHidden()
+  await expect(page.locator('.reference-scene-overlay time')).toBeVisible()
+  await expect(page.locator('.reference-scene-overlay strong')).toBeVisible()
   await expect(page.getByRole('button', { name: /설명 녹음/ })).toHaveCount(0)
   await page.getByLabel('선택한 클립 문구').fill('머리핀을 꽂았어요❤️')
   await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)
   await page.getByLabel('영어 자막').fill('')
   await expect(page.getByLabel('영어 자막')).toHaveValue('')
-  await expect(page.locator('.reference-scene-overlay > small')).toHaveText('')
+  await expect(page.locator('.scene-overlay-copy > small')).toHaveText('')
   await page.getByRole('button', { name: '자동 번역' }).click()
   await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)
   await expect.poll(() => page.locator('.phone-preview video').evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)

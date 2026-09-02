@@ -229,11 +229,13 @@ export const EditorScreen = ({
                 <p>{coverEnglish}</p>
               </div>
             ) : (
-              <div key={`${activePreviewClip.id}-${activePreviewClip.displayTime}-${activePreviewClip.activity}-${previewPresentation.english}-${sceneOverlayVersion}`} className="reference-scene-overlay scene-overlay-flash">
-                <span className="xp-scene-tag"><i>{activePreviewClip.activityIcon || previewPresentation.icon}</i><em>CLIP_INFO.EXE</em><b>×</b></span>
-                <time>{activePreviewClip.displayTime}</time>
-                <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
-                <small>{previewPresentation.english}</small>
+              <div className="reference-scene-overlay">
+                <span key={`${activePreviewClip.id}-${sceneOverlayVersion}`} className="xp-scene-tag xp-scene-tag--brief"><i>{activePreviewClip.activityIcon || previewPresentation.icon}</i><em>CLIP_INFO.EXE</em><b>×</b></span>
+                <div className="scene-overlay-copy">
+                  <time>{activePreviewClip.displayTime}</time>
+                  <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
+                  <small>{previewPresentation.english}</small>
+                </div>
               </div>
             )}
             {activePreviewClip.caption && tab !== 'COVER' && <p className="manual-video-caption">{activePreviewClip.caption}</p>}

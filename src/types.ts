@@ -53,6 +53,7 @@ export interface PopupConfig {
 export interface DailoClip {
   id: string
   name: string
+  sourceKey?: string
   mediaUrl: string
   videoBlob?: Blob
   thumbnail: string

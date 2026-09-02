@@ -133,6 +133,8 @@ export const createClipThumbnail = async (mediaUrl: string, duration: number) =>
   return thumbnail
 }
 
+export const createFileSourceKey = (file: File) => `${file.name.toLocaleLowerCase()}::${file.size}`
+
 export const fileToClip = async (file: File, options: { thumbnail?: boolean } = {}): Promise<DailoClip> => {
   const mediaUrl = URL.createObjectURL(file)
   const video = document.createElement('video')
@@ -150,6 +152,7 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
   const clip: DailoClip = {
     id: makeId(),
     name: file.name,
+    sourceKey: createFileSourceKey(file),
     mediaUrl,
     videoBlob: file,
     thumbnail,

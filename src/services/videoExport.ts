@@ -70,22 +70,24 @@ const wrapText = (context: CanvasRenderingContext2D, text: string, maxWidth: num
   return visible
 }
 
-const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number) => {
+const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number, showXpTag: boolean) => {
   const presentation = activityTextProvider.present(clip.activity)
   const centerY = height * 0.5
-  const tagWidth = width * 0.38
-  const tagHeight = width * 0.055
-  const tagX = (width - tagWidth) / 2
-  const tagY = centerY - width * 0.19
-  context.fillStyle = 'rgba(8, 32, 73, .92)'
-  context.fillRect(tagX, tagY, tagWidth, tagHeight)
-  context.strokeStyle = 'rgba(255,255,255,.9)'
-  context.lineWidth = Math.max(2, width * 0.003)
-  context.strokeRect(tagX, tagY, tagWidth, tagHeight)
-  context.fillStyle = '#fff'
-  context.textAlign = 'center'
-  context.font = `700 ${Math.round(width * 0.022)}px Tahoma, Arial, sans-serif`
-  context.fillText(`${clip.activityIcon || presentation.icon}  CLIP_INFO.EXE`, width / 2, tagY + tagHeight * .68)
+  if (showXpTag) {
+    const tagWidth = width * 0.34
+    const tagHeight = width * 0.05
+    const tagX = (width - tagWidth) / 2
+    const tagY = centerY - width * 0.18
+    context.fillStyle = 'rgba(8, 32, 73, .92)'
+    context.fillRect(tagX, tagY, tagWidth, tagHeight)
+    context.strokeStyle = 'rgba(255,255,255,.9)'
+    context.lineWidth = Math.max(2, width * 0.003)
+    context.strokeRect(tagX, tagY, tagWidth, tagHeight)
+    context.fillStyle = '#fff'
+    context.textAlign = 'center'
+    context.font = `700 ${Math.round(width * 0.019)}px Tahoma, Arial, sans-serif`
+    context.fillText(`${clip.activityIcon || presentation.icon}  CLIP_INFO.EXE`, width / 2, tagY + tagHeight * .68)
+  }
 
   context.lineWidth = Math.max(3, width * .006)
   context.strokeStyle = 'rgba(0,0,0,.88)'
@@ -357,7 +359,7 @@ export const renderProject = async (
           context.fillRect(0, 0, canvas.width, canvas.height)
           drawCoveredVideo(context, video, canvas.width, canvas.height)
           const elapsedOutputSeconds = Math.max(video.currentTime - startAt, 0) / clip.speed
-          if (elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS) drawClipBubble(context, clip, canvas.width, canvas.height)
+          drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS)
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({
