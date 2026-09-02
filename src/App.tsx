@@ -30,6 +30,15 @@ interface ExportedVideo {
   fileName: string
 }
 
+interface WritableFileHandle {
+  createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>
+}
+
+interface WritableDirectoryHandle {
+  getDirectoryHandle(name: string, options: { create: boolean }): Promise<WritableDirectoryHandle>
+  getFileHandle(name: string, options: { create: boolean }): Promise<WritableFileHandle>
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [project, setProject] = useState<DailoProject>(() => createProject())
@@ -266,28 +275,42 @@ function App() {
 
   const saveExportedVideo = useCallback(async () => {
     if (!exportedVideo) return
-    const file = new File([exportedVideo.blob], exportedVideo.fileName, { type: exportedVideo.blob.type })
     try {
-      const picker = (window as Window & { showDirectoryPicker?: () => Promise<any> }).showDirectoryPicker
+      const picker = (window as Window & { showDirectoryPicker?: (options?: { id?: string; mode?: 'readwrite'; startIn?: 'videos' }) => Promise<WritableDirectoryHandle> }).showDirectoryPicker
       if (picker) {
-        const root = await picker()
+        const root = await picker({ id: 'dailo-videos', mode: 'readwrite', startIn: 'videos' })
         const folder = await root.getDirectoryHandle('DAILO', { create: true })
         const handle = await folder.getFileHandle(exportedVideo.fileName, { create: true })
         const writer = await handle.createWritable()
         await writer.write(exportedVideo.blob)
         await writer.close()
         setToast('선택한 위치의 DAILO 폴더에 저장했어요.')
-      } else if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'DAILO — 오늘의 영상' })
-        setToast('공유 메뉴에서 “비디오 저장”을 선택해 주세요.')
       } else {
         download(exportedVideo.blob, exportedVideo.fileName)
-        setToast('다운로드 폴더에 고화질 영상을 저장했어요.')
+        setToast('이 브라우저에서는 폴더를 만들 수 없어 다운로드에 저장했어요.')
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       download(exportedVideo.blob, exportedVideo.fileName)
       setToast('다운로드 폴더에 영상을 저장했어요.')
+    }
+  }, [exportedVideo])
+
+  const shareExportedVideo = useCallback(async () => {
+    if (!exportedVideo) return
+    const file = new File([exportedVideo.blob], exportedVideo.fileName, { type: exportedVideo.blob.type })
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'DAILO — 오늘의 영상' })
+        setToast('공유 메뉴로 영상을 보냈어요.')
+      } else {
+        download(exportedVideo.blob, exportedVideo.fileName)
+        setToast('공유 기능을 지원하지 않아 다운로드에 저장했어요.')
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      download(exportedVideo.blob, exportedVideo.fileName)
+      setToast('공유 대신 다운로드에 영상을 저장했어요.')
     }
   }, [exportedVideo])
 
@@ -350,6 +373,7 @@ function App() {
           exportError={exportError}
           exportReady={Boolean(exportedVideo)}
           onSaveExport={saveExportedVideo}
+          onShareExport={shareExportedVideo}
           onCloseExport={() => { setExportState(undefined); setExportError(undefined); setExportedVideo(undefined) }}
           exportPreviewUrl={project.exportAsset?.url}
         />

@@ -242,7 +242,6 @@ export const renderProject = async (
   const clipSources = new Map<string, string>()
   const sourceFor = (clip: DailoClip, refresh = false) => {
     const media = resolveSessionMedia(clip)
-    if (!refresh && media.mediaUrl) return media.mediaUrl
     if (!media.videoBlob) return media.mediaUrl
     const current = clipSources.get(clip.id)
     if (current && !refresh) return current

@@ -21,6 +21,7 @@ interface EditorProps {
   exportError?: string
   exportReady: boolean
   onSaveExport: () => Promise<void>
+  onShareExport: () => Promise<void>
   onCloseExport: () => void
   exportPreviewUrl?: string
 }
@@ -30,22 +31,6 @@ const tabLabels: Record<EditorTab, string> = {
   COVER: '썸네일', CLIP: '장면', TEXT: '자막', TRANSITION: '전환', POPUP: '말풍선',
 }
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
-const previewBlobUrls = new WeakMap<Blob, string>()
-
-const previewSourcesFor = (clip: DailoClip) => {
-  const media = resolveSessionMedia(clip)
-  const sources = media.mediaUrl ? [media.mediaUrl] : []
-  if (media.videoBlob) {
-    let blobUrl = previewBlobUrls.get(media.videoBlob)
-    if (!blobUrl) {
-      blobUrl = URL.createObjectURL(media.videoBlob)
-      previewBlobUrls.set(media.videoBlob, blobUrl)
-    }
-    if (!sources.includes(blobUrl)) sources.push(blobUrl)
-  }
-  return sources
-}
-
 interface LiveClipVideoProps {
   clip: DailoClip
   poster?: string
@@ -56,21 +41,26 @@ interface LiveClipVideoProps {
 }
 
 const LiveClipVideo = forwardRef<HTMLVideoElement, LiveClipVideoProps>(({ clip, poster, onError, onEnded, onPlay, onTimeUpdate }, ref) => {
-  const sources = useMemo(
-    () => previewSourcesFor(clip),
-    [clip],
-  )
-  const [sourceIndex, setSourceIndex] = useState(0)
-  const source = sources[Math.min(sourceIndex, Math.max(sources.length - 1, 0))]
+  const media = resolveSessionMedia(clip)
+  const [attempt, setAttempt] = useState(0)
+  const source = useMemo(() => {
+    if (media.videoBlob && attempt < 2) return URL.createObjectURL(media.videoBlob)
+    return media.mediaUrl
+  }, [attempt, media.mediaUrl, media.videoBlob])
 
-  return <video ref={ref} src={source} poster={poster} playsInline preload="metadata" aria-label={`${clip.name} 장면 미리보기`} title="영상을 눌러 재생하거나 멈출 수 있어요" onClick={(event) => event.currentTarget.paused ? void event.currentTarget.play().catch(() => undefined) : event.currentTarget.pause()} onPlay={onPlay} onError={() => sourceIndex + 1 < sources.length ? setSourceIndex(sourceIndex + 1) : onError()} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
+  useEffect(() => {
+    if (!source?.startsWith('blob:') || source === media.mediaUrl) return
+    return () => URL.revokeObjectURL(source)
+  }, [media.mediaUrl, source])
+
+  return <video ref={ref} src={source} poster={poster} controls playsInline preload="auto" aria-label={`${clip.name} 장면 미리보기`} title="영상을 눌러 재생하거나 멈출 수 있어요" onPlay={onPlay} onError={() => media.videoBlob && attempt < 2 ? setAttempt((current) => current + 1) : onError()} onEnded={onEnded} onTimeUpdate={(event) => onTimeUpdate(event.currentTarget)} />
 })
 
 LiveClipVideo.displayName = 'LiveClipVideo'
 
 export const EditorScreen = ({
   project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onReplaceMedia, onExport, exportState, exportError,
-  exportReady, onSaveExport, onCloseExport, exportPreviewUrl, onUpdateProject, onOpenArchive,
+  exportReady, onSaveExport, onShareExport, onCloseExport, exportPreviewUrl, onUpdateProject, onOpenArchive,
 }: EditorProps) => {
   const [tab, setTab] = useState<EditorTab>('COVER')
   const [showAssistant, setShowAssistant] = useState(false)
@@ -352,8 +342,8 @@ export const EditorScreen = ({
             {!exportError && <ProgressBar value={exportState?.percent ?? 0} />}
             {!exportError && <small>{exportState?.percent ?? 0}% · 브라우저를 닫지 마세요.</small>}
             {exportReady && exportPreviewUrl && <video className="export-result-preview" src={exportPreviewUrl} controls playsInline preload="metadata" />}
-            {exportReady && <RetroButton className="save-export-button" onClick={() => void onSaveExport()}>영상 저장하기</RetroButton>}
-            {exportReady && <p className="save-help">PC·지원 기기에서는 DAILO 폴더를 만들 수 있어요.<br />iPhone은 공유 메뉴에서 ‘비디오 저장’을 선택해 주세요.</p>}
+            {exportReady && <div className="export-save-actions"><RetroButton className="save-export-button" onClick={() => void onSaveExport()}>DAILO 폴더 저장</RetroButton><RetroButton className="share-export-button" onClick={() => void onShareExport()}>갤러리로 보내기</RetroButton></div>}
+            {exportReady && <p className="save-help">폴더 선택이 열리면 저장 위치를 고르세요. 그 안에 DAILO 폴더가 생겨요.<br />인앱 브라우저·iPhone은 ‘갤러리로 보내기’에서 비디오 저장을 선택해 주세요.</p>}
             {(exportError || exportReady) && <button className="plain-close" onClick={onCloseExport}>닫기</button>}
           </RetroWindow>
         </div>

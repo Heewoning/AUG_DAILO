@@ -990,3 +990,43 @@ button { cursor: pointer; }
   .editor-screen--cover .cover-montage-status > i { width: 24px; height: 24px; }
   .editor-screen--cover .cover-montage-status small { display: none; }
 }
+
+/* Final mobile viewport pass: one page without shrinking the primary controls. */
+.export-save-actions { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-save-actions .retro-button { width: 100%; min-height: 44px; padding-inline: 8px; }
+.share-export-button { color: #fff; border-color: #0b3978; background: linear-gradient(#2f83df, #0649ad); }
+
+@media (max-width: 600px) {
+  .app-shell:has(.simple-home) { height: 100svh; min-height: 0; padding-bottom: 0; overflow: hidden; }
+  .app-shell:has(.simple-home) .site-header { height: 68px; }
+  .simple-home { height: calc(100svh - 68px); min-height: 0; display: block; overflow: hidden; }
+  .simple-home .simple-hero { height: 100%; min-height: 0; padding: 14px 0 84px; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(145px, 1fr); gap: 10px; overflow: hidden; }
+  .simple-home .hero-copy { padding: 0; }
+  .simple-home .eyebrow { margin: 0 0 8px; }
+  .simple-home .hero-copy h1 { margin-bottom: 12px; font-size: clamp(34px, 10.5vw, 40px); line-height: 1.04; }
+  .simple-home .hero-kicker { margin-bottom: 14px; font-size: 13px; line-height: 1.45; }
+  .simple-home .primary-cta { min-height: 50px; }
+  .simple-home .home-mini-steps { margin-top: 14px; }
+  .simple-home .simple-hero-window { min-height: 0; overflow: hidden; }
+  .simple-home .simple-hero-window .hero-window { width: 100%; height: 100%; transform: none; display: grid; grid-template-rows: 30px minmax(0, 1fr); }
+  .simple-home .simple-hero-window .hero-window > .retro-titlebar { height: 30px; }
+  .simple-home .simple-hero-window .hero-window > .retro-window__body { height: 100%; min-height: 0; padding: 5px; box-sizing: border-box; }
+  .simple-home .day-launcher-art { height: 100%; min-height: 0; }
+  .simple-home .launcher-ready { display: none; }
+  .simple-home .launcher-files { top: 24%; }
+  .simple-home .launcher-person { bottom: 38px; transform: translateX(-50%) scale(.72); transform-origin: bottom center; }
+  .simple-home .continue-day { display: none; }
+
+  .app-shell--editor { height: 100svh; min-height: 0; padding-bottom: 0; overflow: hidden; }
+  .app-shell--editor .editor-screen { height: 100svh; min-height: 0; overflow: hidden; }
+  .app-shell--editor .editor-workspace { height: calc(100svh - 186px); min-height: 0; overflow: hidden; }
+  .app-shell--editor .preview-column { height: clamp(170px, 27svh, 215px); flex: 0 0 auto; }
+  .app-shell--editor .inspector { min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  .app-shell--editor .tool-tabs { height: 43px; flex: 0 0 43px; }
+  .app-shell--editor .inspector-panel { height: calc(100% - 43px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .app-shell--editor .clip-sidebar { height: 93px; flex: 0 0 93px; }
+  .app-shell--editor .bottom-nav { position: fixed; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); margin: 0; }
+
+  .export-save-actions { grid-template-columns: 1fr; }
+  .render-dialog .save-help { font-size: 9px !important; line-height: 1.45; }
+}
