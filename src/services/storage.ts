@@ -8,6 +8,7 @@ const persistedVoiceVersions = new Map<string, string>()
 const persistedExportVersions = new Map<string, string>()
 const persistedVideoVersions = new Map<string, Blob>()
 const pendingVideoWrites = new Map<string, { blob: Blob; promise: Promise<void> }>()
+let projectSaveQueue: Promise<void> = Promise.resolve()
 
 type StoredVoice = Omit<VoiceTrack, 'blob' | 'url'> & { hasBlob: boolean }
 type StoredClip = Omit<DailoClip, 'mediaUrl' | 'videoBlob' | 'voice'> & {
@@ -153,7 +154,7 @@ const toStoredClip = (clip: DailoClip): StoredClip => {
   }
 }
 
-export const saveProject = async (project: DailoProject) => {
+const saveProjectNow = async (project: DailoProject) => {
   const { exportAsset, ...projectMetadata } = project
   const stored: StoredProject = {
     ...projectMetadata,
@@ -184,6 +185,12 @@ export const saveProject = async (project: DailoProject) => {
     persistedExportVersions.set(exportKey, exportAsset.createdAt)
   }
   localStorage.setItem(PROJECT_KEY, JSON.stringify([stored, ...projects].slice(0, 30)))
+}
+
+export const saveProject = (project: DailoProject) => {
+  const operation = projectSaveQueue.catch(() => undefined).then(() => saveProjectNow(project))
+  projectSaveQueue = operation.catch(() => undefined)
+  return operation
 }
 
 const hydrateClip = async (projectId: string, clip: StoredClip): Promise<DailoClip> => {

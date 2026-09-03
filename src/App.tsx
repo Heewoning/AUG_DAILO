@@ -126,36 +126,65 @@ function App() {
         if (!batch.length) continue
         loadedCount += batch.length
         thumbnailQueue.push(...batch)
-        setProject((current) => ({
-          ...current,
-          clips: [...current.clips, ...batch].sort(
-            (first, second) => new Date(first.capturedAt).getTime() - new Date(second.capturedAt).getTime(),
-          ),
-          updatedAt: new Date().toISOString(),
-        }))
-        setSelectedClipId((current) => current ?? batch[0]?.id)
-        setLoadingFiles(false)
       }
       if (!loadedCount) throw new Error('선택한 영상을 읽지 못했어요. 다른 파일로 다시 시도해 주세요.')
+      setProject((current) => ({
+        ...current,
+        clips: [...current.clips, ...thumbnailQueue].sort(
+          (first, second) => new Date(first.capturedAt).getTime() - new Date(second.capturedAt).getTime(),
+        ),
+        updatedAt: new Date().toISOString(),
+      }))
+      setSelectedClipId((current) => current ?? thumbnailQueue[0]?.id)
+
+      const thumbnails = new Map<string, string>()
+      for (let index = 0; index < thumbnailQueue.length; index += 2) {
+        const results = await Promise.allSettled(thumbnailQueue.slice(index, index + 2).map(async (clip) => ({
+          id: clip.id,
+          thumbnail: await createClipThumbnail(clip.mediaUrl, clip.duration),
+        })))
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.thumbnail) thumbnails.set(result.value.id, result.value.thumbnail)
+        }
+      }
+      setProject((current) => ({
+        ...current,
+        clips: current.clips.map((clip) => thumbnails.has(clip.id) ? { ...clip, thumbnail: thumbnails.get(clip.id)! } : clip),
+        updatedAt: new Date().toISOString(),
+      }))
       setToast(duplicateCount
         ? `${loadedCount}개를 불러오고, 중복 영상 ${duplicateCount}개는 제외했어요.`
-        : `${loadedCount}개의 영상을 바로 불러왔어요.`)
-      void (async () => {
-        for (const clip of thumbnailQueue) {
-          try {
-            const thumbnail = await createClipThumbnail(clip.mediaUrl, clip.duration)
-            if (thumbnail) setProject((current) => ({
-              ...current,
-              clips: current.clips.map((item) => item.id === clip.id ? { ...item, thumbnail } : item),
-            }))
-          } catch {
-            // Preview playback remains available even if iOS cannot seek a thumbnail immediately.
-          }
-        }
-      })()
+        : `${loadedCount}개의 원본과 미리보기를 준비했어요.`)
     } catch (error) {
       setToast(error instanceof Error ? error.message : '영상을 불러오지 못했습니다.')
     } finally {
+      setLoadingFiles(false)
+    }
+  }, [project.clips])
+
+  const retryClipThumbnail = useCallback(async (clipId: string) => {
+    const clip = project.clips.find((item) => item.id === clipId)
+    if (!clip) return
+    const media = resolveSessionMedia(clip)
+    if (!media.videoBlob && !media.mediaUrl) {
+      setToast('원본 영상이 없어 교체가 필요해요.')
+      return
+    }
+    setLoadingFiles(true)
+    const temporaryUrl = media.videoBlob ? URL.createObjectURL(media.videoBlob) : undefined
+    try {
+      const thumbnail = await createClipThumbnail(temporaryUrl || media.mediaUrl, clip.duration)
+      if (!thumbnail) throw new Error('영상 프레임을 만들지 못했어요.')
+      setProject((current) => ({
+        ...current,
+        clips: current.clips.map((item) => item.id === clipId ? { ...item, thumbnail } : item),
+        updatedAt: new Date().toISOString(),
+      }))
+      setToast('미리보기를 다시 만들었어요.')
+    } catch {
+      setToast('미리보기를 만들지 못했어요. 원본 교체를 눌러 다시 골라 주세요.')
+    } finally {
+      if (temporaryUrl) URL.revokeObjectURL(temporaryUrl)
       setLoadingFiles(false)
     }
   }, [project.clips])
@@ -380,6 +409,7 @@ function App() {
           onRemove={removeClip}
           onMove={moveClip}
           onReplace={replaceClipSource}
+          onRetryThumbnail={retryClipThumbnail}
           onAnalyze={analyze}
         />
       )}

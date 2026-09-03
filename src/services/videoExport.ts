@@ -12,6 +12,7 @@ type FrameTrack = MediaStreamTrack & { requestFrame?: () => void }
 
 const delay = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 const SCENE_OVERLAY_SECONDS = 0.3
+const TRANSITION_SECONDS = 0.35
 
 const waitForMedia = (target: EventTarget, eventName: string, timeout = 15_000) =>
   new Promise<void>((resolve, reject) => {
@@ -42,6 +43,38 @@ const drawCoveredVideo = (context: CanvasRenderingContext2D, video: HTMLVideoEle
   const drawWidth = video.videoWidth * scale
   const drawHeight = video.videoHeight * scale
   context.drawImage(video, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight)
+}
+
+const drawTransitionOverlay = (context: CanvasRenderingContext2D, clip: DailoClip, elapsed: number, width: number, height: number) => {
+  if (clip.transition === 'HARD CUT' || elapsed >= TRANSITION_SECONDS) return
+  const progress = Math.min(Math.max(elapsed / TRANSITION_SECONDS, 0), 1)
+  context.save()
+  if (clip.transition === 'FLASH') {
+    context.fillStyle = `rgba(255,255,255,${.9 * (1 - progress)})`
+    context.fillRect(0, 0, width, height)
+  } else if (clip.transition === 'PHONE SCREEN') {
+    const opening = width * progress
+    context.fillStyle = '#050505'
+    context.fillRect(0, 0, (width - opening) / 2, height)
+    context.fillRect((width + opening) / 2, 0, (width - opening) / 2, height)
+  } else if (clip.transition === 'WINDOW POP-UP') {
+    context.globalAlpha = 1 - progress
+    const panelWidth = width * .7
+    const panelHeight = width * .34
+    const left = (width - panelWidth) / 2
+    const top = (height - panelHeight) / 2
+    context.fillStyle = '#f4edda'
+    context.fillRect(left, top, panelWidth, panelHeight)
+    context.fillStyle = '#0754bc'
+    context.fillRect(left, top, panelWidth, width * .06)
+    context.strokeStyle = '#fff'
+    context.lineWidth = Math.max(2, width * .004)
+    context.strokeRect(left, top, panelWidth, panelHeight)
+  } else {
+    context.fillStyle = `rgba(0,0,0,${.85 * (1 - progress)})`
+    context.fillRect(0, 0, width, height)
+  }
+  context.restore()
 }
 
 const fitText = (context: CanvasRenderingContext2D, text: string, maxWidth: number) => {
@@ -113,20 +146,25 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.textAlign = 'start'
 
   if (clip.popup.enabled) {
-    const popupWidth = width * 0.56
+    const popupWidth = width * 0.68
     const popupX = (width - popupWidth) / 2
-    const popupY = height * 0.1
+    const popupY = height * 0.12
+    const popupHeight = width * 0.2
     context.fillStyle = '#fff4c9'
-    context.fillRect(popupX, popupY, popupWidth, width * 0.19)
-    context.strokeRect(popupX, popupY, popupWidth, width * 0.19)
+    context.fillRect(popupX, popupY, popupWidth, popupHeight)
+    context.strokeRect(popupX, popupY, popupWidth, popupHeight)
     context.fillStyle = '#0a52b8'
-    context.fillRect(popupX, popupY, popupWidth, width * 0.055)
+    context.fillRect(popupX, popupY, popupWidth, width * 0.048)
     context.fillStyle = '#fff'
-    context.font = `700 ${Math.round(width * 0.027)}px Tahoma, sans-serif`
-    context.fillText(clip.popup.title, popupX + width * 0.02, popupY + width * 0.038)
+    context.textAlign = 'center'
+    context.font = `700 ${Math.round(width * 0.019)}px Tahoma, sans-serif`
+    context.fillText(fitText(context, clip.popup.title, popupWidth - width * .08), width / 2, popupY + width * 0.033)
     context.fillStyle = '#25201d'
-    context.font = `700 ${Math.round(width * 0.032)}px Arial, sans-serif`
-    context.fillText(fitText(context, clip.popup.message, popupWidth - width * 0.08), popupX + width * 0.04, popupY + width * 0.13)
+    const popupTextSize = Math.round(width * 0.025)
+    context.font = `700 ${popupTextSize}px Arial, sans-serif`
+    const popupLines = wrapText(context, clip.popup.message, popupWidth - width * .1, 2)
+    popupLines.forEach((line, index) => context.fillText(line, width / 2, popupY + width * (.105 + index * .035)))
+    context.textAlign = 'start'
   }
 
   if (clip.caption) {
@@ -240,6 +278,8 @@ export const renderProject = async (
   const video = document.createElement('video')
   video.playsInline = true
   video.preload = 'auto'
+  video.style.cssText = 'position:fixed;width:1px;height:1px;left:-10px;bottom:0;opacity:.001;pointer-events:none'
+  document.body.append(video)
   const temporaryUrls = new Set<string>()
   const clipSources = new Map<string, string>()
   const sourceFor = (clip: DailoClip, refresh = false) => {
@@ -261,6 +301,7 @@ export const renderProject = async (
       video.src = sourceFor(clip, refresh)
       video.load()
       await waitForMedia(video, 'loadedmetadata', 20_000)
+      if (video.readyState < 2) await waitForMedia(video, 'loadeddata', 20_000)
     }
     try {
       await load()
@@ -268,6 +309,25 @@ export const renderProject = async (
       if (!resolveSessionMedia(clip).videoBlob) throw error
       await load(true)
     }
+  }
+  const playClip = async (startAt: number, endAt: number) => {
+    let lastError: unknown
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0 || video.ended || video.currentTime >= endAt - .02) {
+        video.pause()
+        await seekVideo(video, startAt)
+        await delay(60)
+      }
+      try {
+        await video.play()
+        if (!video.paused && !video.ended) return
+      } catch (error) {
+        lastError = error
+        if (video.ended || video.currentTime >= endAt - .02 || video.currentTime > startAt + .05) return
+      }
+      if (attempt === 1) video.muted = true
+    }
+    throw lastError instanceof Error ? lastError : new Error('클립 재생을 시작하지 못했어요.')
   }
   const videoSource = audioContext.createMediaElementSource(video)
   const videoGain = audioContext.createGain()
@@ -351,7 +411,7 @@ export const renderProject = async (
         }
       }
 
-      await video.play()
+      await playClip(startAt, endAt)
       const frameStartedAt = performance.now()
       await new Promise<void>((resolve, reject) => {
         const frame = () => {
@@ -359,6 +419,7 @@ export const renderProject = async (
           context.fillRect(0, 0, canvas.width, canvas.height)
           drawCoveredVideo(context, video, canvas.width, canvas.height)
           const elapsedOutputSeconds = Math.max(video.currentTime - startAt, 0) / clip.speed
+          drawTransitionOverlay(context, clip, elapsedOutputSeconds, canvas.width, canvas.height)
           drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS)
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
@@ -396,6 +457,7 @@ export const renderProject = async (
     return { blob, extension: recorder.mimeType.includes('mp4') ? 'mp4' : 'webm', skippedCount }
   } finally {
     video.pause()
+    video.remove()
     canvasStream.getTracks().forEach((track) => track.stop())
     combinedStream.getTracks().forEach((track) => track.stop())
     if (recorder.state !== 'inactive') recorder.stop()

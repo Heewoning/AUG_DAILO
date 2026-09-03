@@ -57,12 +57,14 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
     return Array.from(new Uint8Array(await blob.arrayBuffer()))
   })
 
-  await page.locator('input[type=file]').setInputFiles({
-    name: 'morning-coffee.webm',
-    mimeType: 'video/webm',
-    buffer: Buffer.from(videoBytes),
-  })
+  await page.locator('input[type=file]').setInputFiles([
+    { name: 'morning-coffee.webm', mimeType: 'video/webm', buffer: Buffer.from(videoBytes) },
+    { name: 'office.webm', mimeType: 'video/webm', buffer: Buffer.from(videoBytes) },
+    { name: 'side-job.webm', mimeType: 'video/webm', buffer: Buffer.from(videoBytes) },
+    { name: 'night.webm', mimeType: 'video/webm', buffer: Buffer.from(videoBytes) },
+  ])
   await expect(page.getByAltText('morning-coffee.webm 대표 장면')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByAltText('night.webm 대표 장면')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByLabel('morning-coffee.webm 미리보기')).toBeVisible()
   await page.locator('.drop-zone input[type=file]').setInputFiles({
     name: 'morning-coffee.webm',
@@ -70,29 +72,41 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
     buffer: Buffer.from(videoBytes),
   })
   await expect(page.getByText(/중복 영상은 추가하지 않았어요/)).toBeVisible()
-  await expect(page.locator('.thumbnail-grid article')).toHaveCount(1)
+  await expect(page.locator('.thumbnail-grid article')).toHaveCount(4)
+  await expect(page.getByRole('button', { name: /꾸미기 시작/ })).toBeEnabled()
   await page.getByRole('button', { name: /꾸미기 시작/ }).click()
   await expect(page.getByText('MY_DAY_IS_RUNNING.EXE')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('USER VOICE ONLY')).toHaveCount(0)
   await expect(page.locator('.reference-cover-overlay')).toBeVisible()
-  await page.getByRole('button', { name: '장면', exact: true }).click()
+  await page.getByRole('button', { name: '장면·자막', exact: true }).click()
+  for (let index = 0; index < 4; index += 1) {
+    await page.locator('.clip-sidebar-card__select').nth(index).click()
+    await expect.poll(() => page.locator('.phone-preview video').evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)
+    await expect(page.locator('.editor-media-retry')).toHaveCount(0)
+  }
+  await page.locator('.clip-sidebar-card__select').first().click()
   await expect.poll(() => page.locator('.phone-preview video').evaluate((video: HTMLVideoElement) => ({ readyState: video.readyState, source: video.currentSrc }))).toMatchObject({ readyState: expect.any(Number), source: expect.stringMatching(/^blob:/) })
   const timeInput = page.getByLabel('선택한 클립 시간')
   await expect(timeInput).toBeVisible()
   expect(await timeInput.inputValue()).toMatch(/^\d{2}:\d{2}$/)
+  if ((page.viewportSize()?.width ?? 1000) <= 600) {
+    const previewBox = await page.locator('.preview-column').boundingBox()
+    const inspectorBox = await page.locator('.inspector').boundingBox()
+    const clipStripBox = await page.locator('.clip-sidebar').boundingBox()
+    expect(previewBox?.y).toBeLessThan(clipStripBox?.y ?? 0)
+    expect(clipStripBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
+    expect(previewBox?.height).toBeGreaterThanOrEqual(270)
+  }
   await page.getByLabel('선택한 클립 문구').fill('다이소 출근')
   await expect(page.getByText('Going to work at Daiso', { exact: true })).toBeVisible()
   await expect(page.locator('.reference-scene-overlay')).toContainText('Going to work at Daiso')
   if ((page.viewportSize()?.width ?? 1000) <= 600) {
     expect(await page.locator('.reference-scene-overlay time').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(28)
     const previewBox = await page.locator('.preview-column').boundingBox()
-    const inspectorBox = await page.locator('.inspector').boundingBox()
-    const clipStripBox = await page.locator('.clip-sidebar').boundingBox()
-    expect(previewBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
-    expect(clipStripBox?.y).toBeLessThan(inspectorBox?.y ?? 0)
-    expect(previewBox?.height).toBeGreaterThanOrEqual(270)
+    expect(previewBox?.height).toBeLessThanOrEqual(165)
     await expect(page.locator('.editor-quest-bar')).toBeHidden()
     await expect(page.locator('.app-shell--editor .bottom-nav')).toBeHidden()
+    await expect(page.locator('.clip-sidebar')).toBeHidden()
   }
   await page.waitForTimeout(350)
   await expect(page.locator('.xp-scene-tag')).toBeHidden()
@@ -104,8 +118,12 @@ test('home to upload thumbnails to editor flow works', async ({ page }) => {
   await page.getByLabel('영어 자막').fill('')
   await expect(page.getByLabel('영어 자막')).toHaveValue('')
   await expect(page.locator('.scene-overlay-copy > small')).toHaveText('')
+  await page.getByLabel('영어 자막').blur()
   await page.getByRole('button', { name: '자동 번역' }).click()
   await expect(page.getByLabel('영어 자막')).toHaveValue(/I put on a hair clip/)
+  await page.getByRole('button', { name: '전환', exact: true }).click()
+  await page.locator('.transition-list button').filter({ hasText: 'FLASH' }).click()
+  await expect(page.locator('.preview-transition--flash')).toHaveCount(1)
   await expect.poll(() => page.locator('.phone-preview video').evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)
   await expect(page.locator('.editor-media-retry')).toHaveCount(0)
 

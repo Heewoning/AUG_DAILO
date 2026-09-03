@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { projectModes } from '../data'
 import { formatDuration } from '../services/mediaMetadata'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
+import { ClipVideo } from '../components/ClipVideo'
 import type { AnalysisProgress, DailoProject, ProjectMode } from '../types'
 
 interface CreateProps {
@@ -14,13 +15,14 @@ interface CreateProps {
   onRemove: (clipId: string) => void
   onMove: (clipId: string, direction: -1 | 1) => void
   onReplace: (clipId: string, file: File) => Promise<void>
+  onRetryThumbnail: (clipId: string) => Promise<void>
   onAnalyze: () => Promise<void>
 }
 
 const steps = ['테마 고르기', '영상 고르기', '꾸미고 저장']
 
 export const CreateScreen = ({
-  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onReplace, onAnalyze,
+  project, loadingFiles, analysisProgress, onModeChange, onProjectChange, onFiles, onRemove, onMove, onReplace, onRetryThumbnail, onAnalyze,
 }: CreateProps) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<1 | 2>(project.clips.length ? 2 : 1)
@@ -133,7 +135,7 @@ export const CreateScreen = ({
               </div>
               <div className="clip-review__content">
                 <div className="upload-preview">
-                  {selected?.mediaUrl && !previewFailed && <video key={selected.id} src={selected.mediaUrl} poster={selected.thumbnail || undefined} controls playsInline preload="metadata" aria-label={`${selected.name} 미리보기`} onError={() => setPreviewFailed(true)} />}
+                  {selected && (selected.mediaUrl || selected.videoBlob) && !previewFailed && <ClipVideo key={selected.id} clip={selected} poster={selected.thumbnail || undefined} ariaLabel={`${selected.name} 미리보기`} onReady={() => setPreviewFailed(false)} onError={() => setPreviewFailed(true)} />}
                   {selected && previewFailed && <div className="media-recovery-panel"><b>이 원본을 읽지 못했어요</b><p>같은 영상 파일을 다시 선택하면 작성한 내용은 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceSource(selected.id, event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onRemove(selected.id) }}>이 클립 삭제</button></div>}
                   <span>{selected?.displayTime}</span><b>{selected?.activity || '장면 문구는 다음 단계에서 적어요'}</b>
                 </div>
@@ -144,7 +146,7 @@ export const CreateScreen = ({
                         {clip.thumbnail ? <img src={clip.thumbnail} alt={`${clip.name} 대표 장면`} /> : <span className="thumbnail-loading">미리보기를 불러오지 못했어요</span>}
                         <i>{String(index + 1).padStart(2, '0')}</i><em>▶</em>
                       </button>
-                      {!clip.thumbnail && <div className="media-recovery-actions"><label>원본 선택<input type="file" accept="video/*" onChange={(event) => void replaceSource(clip.id, event.currentTarget)} /></label><button onClick={() => onRemove(clip.id)}>삭제</button></div>}
+                      {!clip.thumbnail && !loadingFiles && <div className="media-recovery-actions"><button onClick={() => void onRetryThumbnail(clip.id)}>재시도</button><label>원본 교체<input type="file" accept="video/*" onChange={(event) => void replaceSource(clip.id, event.currentTarget)} /></label><button onClick={() => onRemove(clip.id)}>삭제</button></div>}
                       <div><b>{clip.name}</b><small>{clip.displayTime} 촬영 · {formatDuration(clip.duration)}</small><em>{clip.capturedAtSource === 'embedded-metadata' ? '원본 촬영정보' : '파일 날짜 기준'}</em></div>
                       <nav aria-label={`${clip.name} 순서 조절`}>
                         <button onClick={() => onMove(clip.id, -1)} disabled={index === 0}>←</button>
@@ -157,7 +159,7 @@ export const CreateScreen = ({
               </div>
               <div className="create-footer">
                 <p><i>✓</i><span><b>영상 선택 완료</b><small>다음 화면에서 썸네일, 문구와 자막을 꾸며요.</small></span></p>
-                <RetroButton className="primary-cta" onClick={() => void onAnalyze()}>꾸미기 시작 <span>→</span></RetroButton>
+                <RetroButton className="primary-cta" onClick={() => void onAnalyze()} disabled={loadingFiles}>{loadingFiles ? '미리보기 준비 중...' : '꾸미기 시작'} <span>→</span></RetroButton>
               </div>
             </section>
           )}
