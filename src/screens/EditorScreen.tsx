@@ -3,6 +3,7 @@ import { moods, popupSuggestions } from '../data'
 import { formatDuration } from '../services/mediaMetadata'
 import { activityTextProvider } from '../services/activityText'
 import { resolveSessionMedia } from '../services/mediaSession'
+import { popupPlaybackState, VLOG_OVERLAY } from '../services/vlogOverlay'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
 import { ClipVideo } from '../components/ClipVideo'
 import type { DailoClip, DailoProject, EditorTab, Transition } from '../types'
@@ -33,6 +34,26 @@ const tabLabels: Record<EditorTab, string> = {
 }
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 const transitionClassName = (transition: Transition) => transition.toLowerCase().replaceAll(' ', '-')
+
+const XpVlogWidget = ({ clip, progress }: { clip: DailoClip; progress: number }) => {
+  const percent = Math.round(progress * 100)
+  return (
+    <section className={`xp-vlog-widget xp-vlog-widget--${clip.popup.effect.toLowerCase().replaceAll(' ', '-')}`} style={{ '--widget-progress': `${percent}%` } as CSSProperties}>
+      <header><i>{clip.popup.kind === 'WARNING' ? '!' : clip.popup.kind === 'ACHIEVEMENT' ? '★' : '▣'}</i><b>{clip.popup.title}</b><span>×</span></header>
+      <div>
+        {clip.popup.effect === 'XP CLOCK' ? (
+          <><time>{clip.displayTime}</time><small>{clip.popup.message}</small></>
+        ) : clip.popup.effect === 'ENERGY BAR' ? (
+          <><strong>{clip.popup.message || 'ENERGY CHARGING...'}</strong><div className="xp-energy-track"><span /></div><small>{percent}% · CHARGING</small></>
+        ) : (
+          <><span className="warning-icon">!</span><strong>{clip.popup.message}</strong></>
+        )}
+        {clip.popup.button && <em>{clip.popup.button}</em>}
+      </div>
+    </section>
+  )
+}
+
 export const EditorScreen = ({
   project, selectedClipId, saving, onSelect, onUpdateClip, onDeleteClip, onReplaceMedia, onExport, exportState, exportError,
   exportReady, onSaveExport, onShareExport, onCloseExport, exportPreviewUrl, onUpdateProject, onOpenArchive,
@@ -43,6 +64,7 @@ export const EditorScreen = ({
   const [previewIndex, setPreviewIndex] = useState(0)
   const [coverMontageIndex, setCoverMontageIndex] = useState(0)
   const [previewFailed, setPreviewFailed] = useState(false)
+  const [previewElapsed, setPreviewElapsed] = useState(0)
   const [sceneOverlayVersion, setSceneOverlayVersion] = useState(0)
   const [translating, setTranslating] = useState(false)
   const [translationNotice, setTranslationNotice] = useState<string>()
@@ -141,8 +163,18 @@ export const EditorScreen = ({
   const previewPresentation = presentationFor(activePreviewClip)
   const coverEnglish = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
   const coverTitleLength = Array.from(project.coverTitle.replace(/\s/g, '')).length || 1
-  const requestedCoverSize = 42 * ((project.coverFontScale ?? 100) / 100)
-  const fittedCoverSize = Math.max(10, Math.min(requestedCoverSize, requestedCoverSize * Math.min(1, 24 / coverTitleLength)))
+  const requestedCoverSize = VLOG_OVERLAY.cover.titleFont * 100 * ((project.coverFontScale ?? 100) / 100)
+  const fittedCoverSize = Math.max(VLOG_OVERLAY.cover.titleMinFont * 100, Math.min(requestedCoverSize, requestedCoverSize * Math.min(1, 24 / coverTitleLength)))
+  const activePopupState = popupPlaybackState(activePreviewClip, previewElapsed)
+  const showActivePopup = activePreviewClip.popup.enabled && (tab === 'POPUP' || activePopupState.visible)
+  const activePopupProgress = tab === 'POPUP' ? 0.62 : activePopupState.progress
+  const overlayStyle = {
+    '--cover-title-size': `${fittedCoverSize}cqw`,
+    '--scene-time-size': `${VLOG_OVERLAY.scene.timeFont * 100}cqw`,
+    '--scene-korean-size': `${VLOG_OVERLAY.scene.koreanFont * 100}cqw`,
+    '--scene-english-size': `${VLOG_OVERLAY.scene.englishFont * 100}cqw`,
+    '--caption-size': `${VLOG_OVERLAY.caption.font * 100}cqw`,
+  } as CSSProperties
 
   const advancePreview = () => {
     if (!previewAll) return
@@ -204,8 +236,8 @@ export const EditorScreen = ({
 
         <section className="preview-column">
           <div className="preview-label"><span>9:16 · 영상을 눌러 재생</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
-          <div className="phone-preview">
-            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <ClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} ariaLabel={`${activePreviewClip.name} 장면 미리보기`} onReady={() => setPreviewFailed(false)} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onPlay={() => setSceneOverlayVersion((version) => version + 1)} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+          <div className="phone-preview" style={overlayStyle}>
+            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <ClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} ariaLabel={`${activePreviewClip.name} 장면 미리보기`} onReady={() => { setPreviewFailed(false); setPreviewElapsed(0) }} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onPlay={() => setSceneOverlayVersion((version) => version + 1)} onTimeUpdate={(video) => { setPreviewElapsed(Math.max((video.currentTime - activePreviewClip.trimStart) / Math.max(activePreviewClip.speed, 0.1), 0)); if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
             {(previewFailed || activePreviewMissing) && <div className="media-recovery-panel editor-media-retry"><b>원본 영상이 필요해요</b><p>같은 파일을 다시 골라 주세요.<br />작성한 문구는 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>클립 삭제</button></div>}
             <div className="video-gradient" />
             {tab !== 'COVER' && <div key={`${activePreviewClip.id}-${activePreviewClip.transition}-${sceneOverlayVersion}`} className={`preview-transition preview-transition--${transitionClassName(activePreviewClip.transition)}`} />}
@@ -214,7 +246,7 @@ export const EditorScreen = ({
               <div className="reference-cover-overlay">
                 <span className="xp-cover-tag"><i>{previewPresentation.icon}</i><em>DAY_IN_LIFE.EXE</em><b>×</b></span>
                 <small>{project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY'}</small>
-                <h2 style={{ fontSize: `${fittedCoverSize}px` }}>{project.coverTitle || '오늘의 하루'}</h2>
+                <h2>{project.coverTitle || '오늘의 하루'}</h2>
                 <p>{coverEnglish}</p>
               </div>
             ) : (
@@ -228,12 +260,7 @@ export const EditorScreen = ({
               </div>
             )}
             {activePreviewClip.caption && tab !== 'COVER' && <p className="manual-video-caption">{activePreviewClip.caption}</p>}
-            {activePreviewClip.popup.enabled && tab !== 'COVER' && (
-              <RetroWindow title={activePreviewClip.popup.title} className="video-popup compact-video-popup">
-                <div><span className="warning-icon">!</span><b>{activePreviewClip.popup.message}</b></div>
-                <RetroButton>{activePreviewClip.popup.button}</RetroButton>
-              </RetroWindow>
-            )}
+            {showActivePopup && tab !== 'COVER' && <XpVlogWidget clip={activePreviewClip} progress={activePopupProgress} />}
           </div>
           <div className="preview-meta"><span>미리보기 화질 · 가볍게</span><span>저장 화질 · 1080 × 1920</span></div>
         </section>
@@ -284,10 +311,15 @@ export const EditorScreen = ({
           )}
 
           {tab === 'POPUP' && (
-            <div className="inspector-panel">
-              <label className="toggle-field"><span>SHOW POPUP<small>장면 위에 레트로 메시지 표시</small></span><input type="checkbox" checked={selected.popup.enabled} onChange={(event) => updatePopup({ enabled: event.target.checked })} /></label>
+            <div className="inspector-panel popup-panel">
+              <label className="toggle-field"><span>SHOW XP WIDGET<small>선택한 시간에만 레트로 효과 표시</small></span><input type="checkbox" checked={selected.popup.enabled} onChange={(event) => updatePopup({ enabled: event.target.checked })} /></label>
+              <p className="suggestion-label">XP EFFECT</p>
+              <div className="popup-effect-grid">
+                {(['MESSAGE', 'ENERGY BAR', 'XP CLOCK'] as const).map((effect) => <button key={effect} className={selected.popup.effect === effect ? 'active' : ''} onClick={() => updatePopup({ enabled: true, effect })}>{effect === 'MESSAGE' ? '메시지' : effect === 'ENERGY BAR' ? '충전 바' : 'XP 시계'}</button>)}
+              </div>
+              <div className="field-row popup-timing-fields"><label>시작 <span>초</span><input aria-label="말풍선 시작 시간" type="number" min="0" max={Math.max((selected.trimEnd - selected.trimStart) / selected.speed - 0.3, 0)} step="0.1" value={selected.popup.startAt} onChange={(event) => updatePopup({ startAt: Math.max(Number(event.target.value), 0) })} /></label><label>유지 <span>초</span><input aria-label="말풍선 유지 시간" type="number" min="0.3" max={Math.max((selected.trimEnd - selected.trimStart) / selected.speed, 0.3)} step="0.1" value={selected.popup.duration} onChange={(event) => updatePopup({ duration: Math.max(Number(event.target.value), 0.3) })} /></label></div>
               <label>TITLE<select value={selected.popup.kind} onChange={(event) => updatePopup({ kind: event.target.value as DailoClip['popup']['kind'], title: event.target.value })}><option>SYSTEM MESSAGE</option><option>WARNING</option><option>ACHIEVEMENT</option></select></label>
-              <label>MESSAGE<textarea rows={4} value={selected.popup.message} onChange={(event) => updatePopup({ message: event.target.value.toUpperCase() })} /></label>
+              <label>MESSAGE<textarea rows={2} value={selected.popup.message} onChange={(event) => updatePopup({ message: event.target.value.toUpperCase() })} /></label>
               <label>BUTTON<input value={selected.popup.button} onChange={(event) => updatePopup({ button: event.target.value.toUpperCase() })} /></label>
               <p className="suggestion-label">QUICK MESSAGE</p><div className="suggestions">{popupSuggestions.map((message) => <button key={message} onClick={() => updatePopup({ enabled: true, message })}>{message}</button>)}</div>
             </div>
@@ -326,8 +358,8 @@ export const EditorScreen = ({
             {!exportError && <ProgressBar value={exportState?.percent ?? 0} />}
             {!exportError && <small>{exportState?.percent ?? 0}% · 브라우저를 닫지 마세요.</small>}
             {exportReady && exportPreviewUrl && <video className="export-result-preview" src={exportPreviewUrl} controls playsInline preload="metadata" />}
-            {exportReady && <div className="export-save-actions"><RetroButton className="save-export-button" onClick={() => void onSaveExport()}>DAILO 폴더 저장</RetroButton><RetroButton className="share-export-button" onClick={() => void onShareExport()}>갤러리로 보내기</RetroButton></div>}
-            {exportReady && <p className="save-help">폴더 선택이 열리면 저장 위치를 고르세요. 그 안에 DAILO 폴더가 생겨요.<br />인앱 브라우저·iPhone은 ‘갤러리로 보내기’에서 비디오 저장을 선택해 주세요.</p>}
+            {exportReady && <div className="export-save-actions"><RetroButton className="share-export-button" onClick={() => void onShareExport()}>갤러리에 저장</RetroButton><RetroButton className="save-export-button" onClick={() => void onSaveExport()}>DAILO 폴더</RetroButton></div>}
+            {exportReady && <p className="save-help">휴대폰은 ‘갤러리에 저장’을 누른 뒤 공유 메뉴에서 비디오 저장을 선택하세요.<br />지원하지 않는 브라우저에서는 다운로드 폴더에 자동 저장됩니다.</p>}
             {(exportError || exportReady) && <button className="plain-close" onClick={onCloseExport}>닫기</button>}
           </RetroWindow>
         </div>

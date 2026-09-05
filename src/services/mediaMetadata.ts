@@ -174,9 +174,12 @@ export const fileToClip = async (file: File, options: { thumbnail?: boolean } = 
     popup: {
       enabled: false,
       kind: 'SYSTEM MESSAGE',
+      effect: 'MESSAGE',
       title: 'SYSTEM MESSAGE',
       message: 'LIFE.EXE IS RUNNING...',
       button: 'OK',
+      startAt: 0.35,
+      duration: 1.6,
     },
   }
   rememberSessionMedia(clip.id, { mediaUrl: clip.mediaUrl, videoBlob: clip.videoBlob })

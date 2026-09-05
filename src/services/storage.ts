@@ -92,7 +92,16 @@ const normalizeStoredClip = (value: unknown, index: number): StoredClip | undefi
     volume: Number.isFinite(clip.volume) ? Number(clip.volume) : 100,
     speed: Number.isFinite(clip.speed) ? Number(clip.speed) : 1,
     transition: clip.transition ?? 'AUTO',
-    popup: clip.popup ?? { enabled: false, kind: 'SYSTEM MESSAGE', title: 'SYSTEM MESSAGE', message: 'LIFE.EXE IS RUNNING...', button: 'OK' },
+    popup: {
+      enabled: clip.popup?.enabled ?? false,
+      kind: clip.popup?.kind ?? 'SYSTEM MESSAGE',
+      effect: clip.popup?.effect ?? 'MESSAGE',
+      title: clip.popup?.title ?? 'SYSTEM MESSAGE',
+      message: clip.popup?.message ?? 'LIFE.EXE IS RUNNING...',
+      button: clip.popup?.button ?? 'OK',
+      startAt: Number.isFinite(clip.popup?.startAt) ? Number(clip.popup?.startAt) : 0.35,
+      duration: Number.isFinite(clip.popup?.duration) ? Number(clip.popup?.duration) : 1.6,
+    },
     hasVideoBlob: Boolean(clip.hasVideoBlob),
   } as StoredClip
 }

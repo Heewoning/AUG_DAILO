@@ -45,9 +45,12 @@ export interface ClipAnalysis {
 export interface PopupConfig {
   enabled: boolean
   kind: 'SYSTEM MESSAGE' | 'WARNING' | 'ACHIEVEMENT'
+  effect: 'MESSAGE' | 'ENERGY BAR' | 'XP CLOCK'
   title: string
   message: string
   button: string
+  startAt: number
+  duration: number
 }
 
 export interface DailoClip {

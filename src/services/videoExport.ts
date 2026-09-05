@@ -1,6 +1,7 @@
 import type { DailoClip, DailoProject } from '../types'
 import { activityTextProvider } from './activityText'
 import { resolveSessionMedia } from './mediaSession'
+import { popupPlaybackState, VLOG_OVERLAY } from './vlogOverlay'
 
 export interface ExportProgress {
   percent: number
@@ -103,13 +104,105 @@ const wrapText = (context: CanvasRenderingContext2D, text: string, maxWidth: num
   return visible
 }
 
-const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number, showXpTag: boolean) => {
+const drawXpWidget = (context: CanvasRenderingContext2D, clip: DailoClip, elapsed: number, width: number, height: number) => {
+  const state = popupPlaybackState(clip, elapsed)
+  if (!state.visible) return
+  const style = VLOG_OVERLAY.popup
+  const popupX = width * style.left
+  const popupWidth = width * (1 - style.left - style.right)
+  const popupY = height * style.top
+  const titleHeight = width * style.titleBarHeight
+  const bodyHeight = width * (clip.popup.effect === 'XP CLOCK' ? 0.3 : 0.24)
+  const popupHeight = titleHeight + bodyHeight
+
+  context.save()
+  context.fillStyle = '#f4edda'
+  context.fillRect(popupX, popupY, popupWidth, popupHeight)
+  context.strokeStyle = '#fff'
+  context.lineWidth = Math.max(3, width * 0.006)
+  context.strokeRect(popupX, popupY, popupWidth, popupHeight)
+  context.strokeStyle = '#063f94'
+  context.lineWidth = Math.max(2, width * 0.004)
+  context.strokeRect(popupX - width * .006, popupY - width * .006, popupWidth + width * .012, popupHeight + width * .012)
+  context.fillStyle = '#0754bc'
+  context.fillRect(popupX, popupY, popupWidth, titleHeight)
+
+  const iconSize = titleHeight * .62
+  context.fillStyle = '#f4cf63'
+  context.fillRect(popupX + width * .025, popupY + (titleHeight - iconSize) / 2, iconSize, iconSize)
+  context.fillStyle = '#fff'
+  context.textAlign = 'left'
+  context.textBaseline = 'middle'
+  context.font = `700 ${Math.round(width * style.titleFont)}px Tahoma, Arial, sans-serif`
+  const titleX = popupX + width * .025 + iconSize + width * .025
+  context.fillText(fitText(context, clip.popup.title, popupWidth - (titleX - popupX) - titleHeight), titleX, popupY + titleHeight / 2)
+  const closeSize = titleHeight * .62
+  const closeX = popupX + popupWidth - closeSize - width * .02
+  context.fillStyle = '#d54b34'
+  context.fillRect(closeX, popupY + (titleHeight - closeSize) / 2, closeSize, closeSize)
+  context.fillStyle = '#fff'
+  context.textAlign = 'center'
+  context.font = `800 ${Math.round(closeSize * .62)}px Tahoma, sans-serif`
+  context.fillText('×', closeX + closeSize / 2, popupY + titleHeight / 2)
+
+  const bodyTop = popupY + titleHeight
+  const bodyCenter = popupX + popupWidth / 2
+  context.fillStyle = '#28211c'
+  if (clip.popup.effect === 'XP CLOCK') {
+    context.font = `400 ${Math.round(width * .13)}px Tahoma, Arial, sans-serif`
+    context.fillText(clip.displayTime, bodyCenter, bodyTop + bodyHeight * .43)
+    context.font = `700 ${Math.round(width * .037)}px Tahoma, Arial, sans-serif`
+    context.fillText(fitText(context, clip.popup.message, popupWidth * .84), bodyCenter, bodyTop + bodyHeight * .76)
+  } else if (clip.popup.effect === 'ENERGY BAR') {
+    context.font = `800 ${Math.round(width * style.messageFont)}px Arial, sans-serif`
+    context.fillText(fitText(context, clip.popup.message || 'ENERGY CHARGING...', popupWidth * .86), bodyCenter, bodyTop + bodyHeight * .28)
+    const trackX = popupX + popupWidth * .08
+    const trackY = bodyTop + bodyHeight * .46
+    const trackWidth = popupWidth * .84
+    const trackHeight = width * .055
+    context.fillStyle = '#fff'
+    context.fillRect(trackX, trackY, trackWidth, trackHeight)
+    context.strokeStyle = '#44372d'
+    context.lineWidth = Math.max(2, width * .004)
+    context.strokeRect(trackX, trackY, trackWidth, trackHeight)
+    const segments = 12
+    for (let index = 0; index < segments; index += 1) {
+      if ((index + 1) / segments > state.progress) break
+      const gap = width * .006
+      const segmentWidth = (trackWidth - gap * (segments + 1)) / segments
+      context.fillStyle = index > 8 ? '#42a84d' : '#1d5db5'
+      context.fillRect(trackX + gap + index * (segmentWidth + gap), trackY + gap, segmentWidth, trackHeight - gap * 2)
+    }
+    context.fillStyle = '#41362e'
+    context.font = `700 ${Math.round(width * .03)}px Tahoma, sans-serif`
+    context.fillText(`${Math.round(state.progress * 100)}% · CHARGING`, bodyCenter, bodyTop + bodyHeight * .84)
+  } else {
+    const warningSize = width * .1
+    context.fillStyle = '#f3c84e'
+    context.beginPath()
+    context.moveTo(popupX + popupWidth * .09, bodyTop + bodyHeight * .77)
+    context.lineTo(popupX + popupWidth * .09 + warningSize / 2, bodyTop + bodyHeight * .18)
+    context.lineTo(popupX + popupWidth * .09 + warningSize, bodyTop + bodyHeight * .77)
+    context.closePath()
+    context.fill()
+    context.fillStyle = '#33281f'
+    context.font = `900 ${Math.round(width * .052)}px Arial, sans-serif`
+    context.fillText('!', popupX + popupWidth * .09 + warningSize / 2, bodyTop + bodyHeight * .58)
+    context.textAlign = 'left'
+    context.font = `800 ${Math.round(width * style.messageFont)}px Arial, sans-serif`
+    const messageLines = wrapText(context, clip.popup.message, popupWidth * .64, 2)
+    messageLines.forEach((line, index) => context.fillText(line, popupX + popupWidth * .28, bodyTop + bodyHeight * (.4 + index * .25)))
+  }
+  context.restore()
+}
+
+const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number, showXpTag: boolean, elapsed: number) => {
   const presentation = activityTextProvider.present(clip.activity)
-  const centerY = height * 0.5
+  const centerY = height * VLOG_OVERLAY.scene.centerY
   if (showXpTag) {
-    const tagWidth = width * 0.34
-    const tagHeight = width * 0.05
-    const tagX = (width - tagWidth) / 2
+    const tagWidth = width * (1 - VLOG_OVERLAY.scene.left - VLOG_OVERLAY.scene.right)
+    const tagHeight = width * 0.09
+    const tagX = width * VLOG_OVERLAY.scene.left
     const tagY = centerY - width * 0.18
     context.fillStyle = 'rgba(8, 32, 73, .92)'
     context.fillRect(tagX, tagY, tagWidth, tagHeight)
@@ -118,26 +211,26 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
     context.strokeRect(tagX, tagY, tagWidth, tagHeight)
     context.fillStyle = '#fff'
     context.textAlign = 'center'
-    context.font = `700 ${Math.round(width * 0.019)}px Tahoma, Arial, sans-serif`
+    context.font = `700 ${Math.round(width * 0.042)}px Tahoma, Arial, sans-serif`
     context.fillText(`${clip.activityIcon || presentation.icon}  CLIP_INFO.EXE`, width / 2, tagY + tagHeight * .68)
   }
 
   context.lineWidth = Math.max(3, width * .006)
   context.strokeStyle = 'rgba(0,0,0,.88)'
   context.fillStyle = '#fff'
-  context.font = `300 ${Math.round(width * 0.085)}px Tahoma, Arial, sans-serif`
+  context.font = `300 ${Math.round(width * VLOG_OVERLAY.scene.timeFont)}px Tahoma, Arial, sans-serif`
   context.strokeText(clip.displayTime, width / 2, centerY)
   context.fillText(clip.displayTime, width / 2, centerY)
-  const koreanSize = Math.round(width * 0.055)
+  const koreanSize = Math.round(width * VLOG_OVERLAY.scene.koreanFont)
   context.font = `800 ${koreanSize}px Arial, sans-serif`
-  const koreanLines = wrapText(context, clip.activity || '이 장면의 문구를 입력해 주세요', width * .82, 2)
-  const koreanStartY = centerY + width * .072
+  const koreanLines = wrapText(context, clip.activity || '이 장면의 문구를 입력해 주세요', width * (1 - VLOG_OVERLAY.scene.left - VLOG_OVERLAY.scene.right), 2)
+  const koreanStartY = centerY + width * .12
   koreanLines.forEach((line, index) => {
     const lineY = koreanStartY + index * koreanSize * .96
     context.strokeText(line, width / 2, lineY)
     context.fillText(line, width / 2, lineY)
   })
-  const englishSize = Math.round(width * 0.03)
+  const englishSize = Math.round(width * VLOG_OVERLAY.scene.englishFont)
   context.font = `500 ${englishSize}px Tahoma, Arial, sans-serif`
   const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish ?? '' : presentation.english, width * .78)
   const englishY = koreanStartY + koreanLines.length * koreanSize * .96 + englishSize * .45
@@ -145,35 +238,15 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
   context.fillText(english, width / 2, englishY)
   context.textAlign = 'start'
 
-  if (clip.popup.enabled) {
-    const popupWidth = width * 0.68
-    const popupX = (width - popupWidth) / 2
-    const popupY = height * 0.12
-    const popupHeight = width * 0.2
-    context.fillStyle = '#fff4c9'
-    context.fillRect(popupX, popupY, popupWidth, popupHeight)
-    context.strokeRect(popupX, popupY, popupWidth, popupHeight)
-    context.fillStyle = '#0a52b8'
-    context.fillRect(popupX, popupY, popupWidth, width * 0.048)
-    context.fillStyle = '#fff'
-    context.textAlign = 'center'
-    context.font = `700 ${Math.round(width * 0.019)}px Tahoma, sans-serif`
-    context.fillText(fitText(context, clip.popup.title, popupWidth - width * .08), width / 2, popupY + width * 0.033)
-    context.fillStyle = '#25201d'
-    const popupTextSize = Math.round(width * 0.025)
-    context.font = `700 ${popupTextSize}px Arial, sans-serif`
-    const popupLines = wrapText(context, clip.popup.message, popupWidth - width * .1, 2)
-    popupLines.forEach((line, index) => context.fillText(line, width / 2, popupY + width * (.105 + index * .035)))
-    context.textAlign = 'start'
-  }
+  drawXpWidget(context, clip, elapsed, width, height)
 
   if (clip.caption) {
-    const captionWidth = width * 0.78
-    const captionSize = Math.round(width * 0.031)
+    const captionWidth = width * (1 - VLOG_OVERLAY.caption.left - VLOG_OVERLAY.caption.right)
+    const captionSize = Math.round(width * VLOG_OVERLAY.caption.font)
     context.font = `600 ${captionSize}px Arial, sans-serif`
     const captionLines = wrapText(context, clip.caption, captionWidth - width * 0.06, 2)
     const captionHeight = width * (captionLines.length > 1 ? .13 : .09)
-    const captionTop = height * .855
+    const captionTop = height - height * VLOG_OVERLAY.caption.bottom - captionHeight
     context.fillStyle = 'rgba(18, 15, 13, .7)'
     context.fillRect((width - captionWidth) / 2, captionTop, captionWidth, captionHeight)
     context.fillStyle = '#fff'
@@ -191,41 +264,42 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
   context.fillRect(0, 0, width, height)
   const coverClip = project.clips[0]
   const presentation = activityTextProvider.present(coverClip?.activity ?? '')
-  const safeCenterX = width * .46
-  const tagWidth = width * .48
-  const tagX = safeCenterX - tagWidth / 2
-  const tagY = height * .37
+  const style = VLOG_OVERLAY.cover
+  const safeCenterX = width * (style.left + (1 - style.left - style.right) / 2)
+  const tagWidth = width * (1 - style.left - style.right)
+  const tagX = width * style.left
+  const tagY = height * style.tagTop
   context.fillStyle = '#0754bc'
-  context.fillRect(tagX, tagY, tagWidth, width * 0.065)
+  context.fillRect(tagX, tagY, tagWidth, width * style.tagHeight)
   context.strokeStyle = '#fff'
   context.lineWidth = Math.max(2, width * .003)
-  context.strokeRect(tagX, tagY, tagWidth, width * .065)
+  context.strokeRect(tagX, tagY, tagWidth, width * style.tagHeight)
   context.fillStyle = '#fff'
   context.textAlign = 'center'
-  context.font = `700 ${Math.round(width * 0.026)}px Tahoma, sans-serif`
-  context.fillText(fitText(context, `${presentation.icon}  DAY_IN_LIFE.EXE   ×`, tagWidth - width * .04), safeCenterX, tagY + width * .045)
+  context.font = `700 ${Math.round(width * style.tagFont)}px Tahoma, sans-serif`
+  context.fillText(fitText(context, `${presentation.icon}  DAY_IN_LIFE.EXE   ×`, tagWidth - width * .08), safeCenterX, tagY + width * .068)
   context.fillStyle = '#fff1a8'
-  context.font = `800 ${Math.round(width * 0.025)}px Tahoma, sans-serif`
-  context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', safeCenterX, tagY + width * .12)
+  context.font = `800 ${Math.round(width * style.kickerFont)}px Tahoma, sans-serif`
+  context.fillText(project.mode === 'N-JOB DAY' ? 'WORKING 3 JOBS A DAY' : 'RUNNING MY DAY', safeCenterX, tagY + width * .16)
   context.fillStyle = '#fff'
   context.strokeStyle = 'rgba(24,18,14,.95)'
   context.lineWidth = Math.max(5, width * .009)
   context.textAlign = 'center'
-  const minimumTitleSize = Math.round(width * 0.02)
-  let titleSize = Math.max(minimumTitleSize, Math.round(width * 0.09 * ((project.coverFontScale ?? 100) / 100)))
+  const minimumTitleSize = Math.round(width * style.titleMinFont)
+  let titleSize = Math.max(minimumTitleSize, Math.round(width * style.titleFont * ((project.coverFontScale ?? 100) / 100)))
   context.font = `900 ${titleSize}px Arial, sans-serif`
   while (titleSize > minimumTitleSize && wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 99).length > 3) {
     titleSize -= 2
     context.font = `900 ${titleSize}px Arial, sans-serif`
   }
   const titleLines = wrapText(context, project.coverTitle || '오늘의 하루.EXE', width * .72, 3)
-  const firstLineY = tagY + width * (titleLines.length > 1 ? .19 : .25)
+  const firstLineY = tagY + width * (titleLines.length > 1 ? .27 : .33)
   titleLines.forEach((line, index) => {
     const y = firstLineY + index * titleSize * 1.02
     context.strokeText(line, safeCenterX, y)
     context.fillText(line, safeCenterX, y)
   })
-  context.font = `600 ${Math.round(width * .03)}px Tahoma, sans-serif`
+  context.font = `600 ${Math.round(width * style.englishFont)}px Tahoma, sans-serif`
   const english = activityTextProvider.present(project.coverTitle.replace(/\.EXE/gi, '')).english
   const englishY = firstLineY + titleLines.length * titleSize * 1.02 + width * .025
   const fittedEnglish = fitText(context, english, width * .68)
@@ -236,8 +310,9 @@ const drawCoverOverlay = (context: CanvasRenderingContext2D, project: DailoProje
 
 const chooseMimeType = () => {
   const safari = /Safari/i.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg/i.test(navigator.userAgent)
-  const candidates = safari
-    ? ['video/mp4;codecs=h264,aac', 'video/mp4', 'video/webm']
+  const prefersGalleryMp4 = safari || /Android/i.test(navigator.userAgent)
+  const candidates = prefersGalleryMp4
+    ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm']
     : ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=h264,aac']
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
 }
@@ -420,7 +495,7 @@ export const renderProject = async (
           drawCoveredVideo(context, video, canvas.width, canvas.height)
           const elapsedOutputSeconds = Math.max(video.currentTime - startAt, 0) / clip.speed
           drawTransitionOverlay(context, clip, elapsedOutputSeconds, canvas.width, canvas.height)
-          drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS)
+          drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS, elapsedOutputSeconds)
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({

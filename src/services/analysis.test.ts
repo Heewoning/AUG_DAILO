@@ -7,7 +7,7 @@ const makeClip = (overrides: Partial<DailoClip> = {}): DailoClip => ({
   duration: 8, trimStart: 0, trimEnd: 8, capturedAt: '2026-08-27T09:30:00+09:00',
   displayTime: '09:30 AM', activity: 'NEW MOMENT', caption: '', mood: 'BUSY', energy: 70,
   volume: 100, speed: 1, transition: 'AUTO',
-  popup: { enabled: false, kind: 'SYSTEM MESSAGE', title: 'SYSTEM MESSAGE', message: 'RUNNING', button: 'OK' },
+  popup: { enabled: false, kind: 'SYSTEM MESSAGE', effect: 'MESSAGE', title: 'SYSTEM MESSAGE', message: 'RUNNING', button: 'OK', startAt: 0.35, duration: 1.6 },
   ...overrides,
 })
 

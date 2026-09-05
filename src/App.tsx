@@ -20,9 +20,11 @@ const download = (blob: Blob, fileName: string) => {
   anchor.download = fileName
   anchor.style.display = 'none'
   document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 2_000)
+  window.requestAnimationFrame(() => {
+    anchor.click()
+    anchor.remove()
+  })
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 interface ExportedVideo {
@@ -355,17 +357,18 @@ function App() {
     if (!exportedVideo) return
     const file = new File([exportedVideo.blob], exportedVideo.fileName, { type: exportedVideo.blob.type })
     try {
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      const canShareFile = Boolean(navigator.share) && (navigator.canShare ? navigator.canShare({ files: [file] }) : true)
+      if (canShareFile) {
         await navigator.share({ files: [file], title: 'DAILO — 오늘의 영상' })
-        setToast('공유 메뉴로 영상을 보냈어요.')
+        setToast('휴대폰 저장 메뉴로 영상을 보냈어요.')
       } else {
         download(exportedVideo.blob, exportedVideo.fileName)
-        setToast('공유 기능을 지원하지 않아 다운로드에 저장했어요.')
+        setToast('다운로드 폴더에 영상을 저장했어요. 갤러리 앱에서도 확인해 주세요.')
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       download(exportedVideo.blob, exportedVideo.fileName)
-      setToast('공유 대신 다운로드에 영상을 저장했어요.')
+      setToast('공유 대신 다운로드 폴더에 영상을 저장했어요.')
     }
   }, [exportedVideo])
 
