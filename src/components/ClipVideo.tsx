@@ -38,7 +38,12 @@ export const ClipVideo = forwardRef<HTMLVideoElement, ClipVideoProps>(({
       preload="auto"
       aria-label={ariaLabel}
       title="영상을 눌러 재생하거나 멈출 수 있어요"
-      onLoadedData={onReady}
+      onLoadedData={(event) => {
+        const video = event.currentTarget
+        const trimStart = Math.min(Math.max(clip.trimStart, 0), Math.max(video.duration - .05, 0))
+        if (Number.isFinite(trimStart) && Math.abs(video.currentTime - trimStart) > .04) video.currentTime = trimStart
+        onReady?.()
+      }}
       onCanPlay={onReady}
       onPlay={onPlay}
       onError={() => attempt < 2 && media.videoBlob ? setAttempt((current) => current + 1) : onError()}

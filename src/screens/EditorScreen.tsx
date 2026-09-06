@@ -3,7 +3,7 @@ import { moods, popupSuggestions } from '../data'
 import { formatDuration } from '../services/mediaMetadata'
 import { activityTextProvider } from '../services/activityText'
 import { resolveSessionMedia } from '../services/mediaSession'
-import { popupPlaybackState, VLOG_OVERLAY } from '../services/vlogOverlay'
+import { popupDuration, VLOG_OVERLAY } from '../services/vlogOverlay'
 import { ProgressBar, RetroButton, RetroWindow } from '../components/Retro'
 import { ClipVideo } from '../components/ClipVideo'
 import type { DailoClip, DailoProject, EditorTab, Transition } from '../types'
@@ -35,16 +35,17 @@ const tabLabels: Record<EditorTab, string> = {
 const transitions: Transition[] = ['AUTO', 'HARD CUT', 'FLASH', 'BLACK SCREEN', 'PHONE SCREEN', 'WINDOW POP-UP']
 const transitionClassName = (transition: Transition) => transition.toLowerCase().replaceAll(' ', '-')
 
-const XpVlogWidget = ({ clip, progress }: { clip: DailoClip; progress: number }) => {
-  const percent = Math.round(progress * 100)
+const XpVlogWidget = ({ clip, progress, previousEnergy = 100 }: { clip: DailoClip; progress: number; previousEnergy?: number }) => {
+  const energy = Math.round(previousEnergy + (clip.energy - previousEnergy) * progress)
+  const charging = clip.energy >= previousEnergy
   return (
-    <section className={`xp-vlog-widget xp-vlog-widget--${clip.popup.effect.toLowerCase().replaceAll(' ', '-')}`} style={{ '--widget-progress': `${percent}%` } as CSSProperties}>
+    <section className={`xp-vlog-widget xp-vlog-widget--${clip.popup.effect.toLowerCase().replaceAll(' ', '-')}`} style={{ '--widget-progress': `${energy}%` } as CSSProperties}>
       <header><i>{clip.popup.kind === 'WARNING' ? '!' : clip.popup.kind === 'ACHIEVEMENT' ? '★' : '▣'}</i><b>{clip.popup.title}</b><span>×</span></header>
       <div>
         {clip.popup.effect === 'XP CLOCK' ? (
           <><time>{clip.displayTime}</time><small>{clip.popup.message}</small></>
         ) : clip.popup.effect === 'ENERGY BAR' ? (
-          <><strong>{clip.popup.message || 'ENERGY CHARGING...'}</strong><div className="xp-energy-track"><span /></div><small>{percent}% · CHARGING</small></>
+          <><strong>{clip.popup.message || (charging ? 'ENERGY CHARGING...' : 'ENERGY DRAINING...')}</strong><div className="xp-energy-track"><span /></div><small>{energy}% · {charging ? 'CHARGING' : 'DRAINING'}</small></>
         ) : (
           <><span className="warning-icon">!</span><strong>{clip.popup.message}</strong></>
         )}
@@ -64,7 +65,8 @@ export const EditorScreen = ({
   const [previewIndex, setPreviewIndex] = useState(0)
   const [coverMontageIndex, setCoverMontageIndex] = useState(0)
   const [previewFailed, setPreviewFailed] = useState(false)
-  const [previewElapsed, setPreviewElapsed] = useState(0)
+  const [intermissionIndex, setIntermissionIndex] = useState<number>()
+  const [intermissionProgress, setIntermissionProgress] = useState(0)
   const [sceneOverlayVersion, setSceneOverlayVersion] = useState(0)
   const [translating, setTranslating] = useState(false)
   const [translationNotice, setTranslationNotice] = useState<string>()
@@ -75,7 +77,7 @@ export const EditorScreen = ({
     [project.clips, selectedClipId],
   )
   useEffect(() => {
-    if (!previewAll || !previewVideoRef.current) return
+    if (!previewAll || intermissionIndex !== undefined || !previewVideoRef.current) return
     const video = previewVideoRef.current
     const clip = project.clips[previewIndex]
     if (!clip) return
@@ -86,7 +88,23 @@ export const EditorScreen = ({
     if (video.readyState >= 1) play()
     else video.addEventListener('loadedmetadata', play, { once: true })
     return () => video.removeEventListener('loadedmetadata', play)
-  }, [previewAll, previewIndex, project.clips])
+  }, [intermissionIndex, previewAll, previewIndex, project.clips])
+
+  useEffect(() => {
+    if (intermissionIndex === undefined) return
+    const clip = project.clips[intermissionIndex]
+    if (!clip) return
+    const startedAt = performance.now()
+    let frame = 0
+    const tick = () => {
+      const progress = Math.min((performance.now() - startedAt) / (popupDuration(clip) * 1000), 1)
+      setIntermissionProgress(progress)
+      if (progress >= 1) setIntermissionIndex(undefined)
+      else frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(frame)
+  }, [intermissionIndex, project.clips])
 
   useEffect(() => {
     if (tab !== 'COVER' || project.clips.length < 2) return
@@ -165,9 +183,13 @@ export const EditorScreen = ({
   const coverTitleLength = Array.from(project.coverTitle.replace(/\s/g, '')).length || 1
   const requestedCoverSize = VLOG_OVERLAY.cover.titleFont * 100 * ((project.coverFontScale ?? 100) / 100)
   const fittedCoverSize = Math.max(VLOG_OVERLAY.cover.titleMinFont * 100, Math.min(requestedCoverSize, requestedCoverSize * Math.min(1, 24 / coverTitleLength)))
-  const activePopupState = popupPlaybackState(activePreviewClip, previewElapsed)
-  const showActivePopup = activePreviewClip.popup.enabled && (tab === 'POPUP' || activePopupState.visible)
-  const activePopupProgress = tab === 'POPUP' ? 0.62 : activePopupState.progress
+  const selectedIndex = Math.max(project.clips.findIndex((clip) => clip.id === selected.id), 0)
+  const widgetClip = intermissionIndex !== undefined ? project.clips[intermissionIndex] : selected
+  const widgetIndex = intermissionIndex ?? selectedIndex
+  const widgetPreviousEnergy = widgetIndex > 0 ? project.clips[widgetIndex - 1]?.energy ?? 100 : 100
+  const showActivePopup = Boolean(widgetClip?.popup.enabled) && (tab === 'POPUP' || intermissionIndex !== undefined)
+  const activePopupProgress = intermissionIndex !== undefined ? intermissionProgress : 1
+  const previewShowsXpCut = intermissionIndex !== undefined || (tab === 'POPUP' && showActivePopup)
   const overlayStyle = {
     '--cover-title-size': `${fittedCoverSize}cqw`,
     '--scene-time-size': `${VLOG_OVERLAY.scene.timeFont * 100}cqw`,
@@ -182,8 +204,10 @@ export const EditorScreen = ({
       const next = previewIndex + 1
       setPreviewFailed(false)
       setPreviewIndex(next)
+      setIntermissionProgress(0)
+      setIntermissionIndex(project.clips[next].popup.enabled ? next : undefined)
       onSelect(project.clips[next].id)
-    } else setPreviewAll(false)
+    } else { setPreviewAll(false); setIntermissionIndex(undefined) }
   }
 
   const startPreview = () => {
@@ -192,6 +216,8 @@ export const EditorScreen = ({
     setPreviewFailed(false)
     setTab('CLIP')
     setPreviewIndex(0)
+    setIntermissionProgress(0)
+    setIntermissionIndex(project.clips[0].popup.enabled ? 0 : undefined)
     setPreviewAll(true)
     onSelect(project.clips[0].id)
   }
@@ -236,8 +262,8 @@ export const EditorScreen = ({
 
         <section className="preview-column">
           <div className="preview-label"><span>9:16 · 영상을 눌러 재생</span><button className={previewAll ? 'active' : ''} onClick={() => previewAll ? setPreviewAll(false) : startPreview()}>{previewAll ? `■ 미리보기 중 ${previewIndex + 1}/${project.clips.length}` : '▶ 전체 브이로그 미리보기'}</button></div>
-          <div className="phone-preview" style={overlayStyle}>
-            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <ClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} ariaLabel={`${activePreviewClip.name} 장면 미리보기`} onReady={() => { setPreviewFailed(false); setPreviewElapsed(0) }} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onPlay={() => setSceneOverlayVersion((version) => version + 1)} onTimeUpdate={(video) => { setPreviewElapsed(Math.max((video.currentTime - activePreviewClip.trimStart) / Math.max(activePreviewClip.speed, 0.1), 0)); if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
+          <div className={`phone-preview ${previewShowsXpCut ? 'phone-preview--intermission' : ''}`} style={overlayStyle}>
+            {tab === 'COVER' && !previewAll ? (activePreviewClip.thumbnail ? <img className="cover-montage-frame" src={activePreviewClip.thumbnail} alt={`${coverMontageIndex + 1}번 커버 장면`} /> : <div className="cover-montage-missing">CLIP {coverMontageIndex + 1}</div>) : !previewFailed && !activePreviewMissing && <ClipVideo ref={previewVideoRef} key={`${activePreviewClip.id}-${previewAll ? previewIndex : 'single'}`} clip={activePreviewClip} poster={activePreviewClip.thumbnail || undefined} ariaLabel={`${activePreviewClip.name} 장면 미리보기`} onReady={() => setPreviewFailed(false)} onError={() => setPreviewFailed(true)} onEnded={advancePreview} onPlay={() => setSceneOverlayVersion((version) => version + 1)} onTimeUpdate={(video) => { if (previewAll && video.currentTime >= activePreviewClip.trimEnd) advancePreview() }} />}
             {(previewFailed || activePreviewMissing) && <div className="media-recovery-panel editor-media-retry"><b>원본 영상이 필요해요</b><p>같은 파일을 다시 골라 주세요.<br />작성한 문구는 유지돼요.</p><label>원본 다시 선택<input type="file" accept="video/*" onChange={(event) => void replaceMedia(event.currentTarget)} /></label><button onClick={() => { setPreviewFailed(false); onDeleteClip(activePreviewClip.id) }}>클립 삭제</button></div>}
             <div className="video-gradient" />
             {tab !== 'COVER' && <div key={`${activePreviewClip.id}-${activePreviewClip.transition}-${sceneOverlayVersion}`} className={`preview-transition preview-transition--${transitionClassName(activePreviewClip.transition)}`} />}
@@ -255,12 +281,13 @@ export const EditorScreen = ({
                 <div className="scene-overlay-copy">
                   <time>{activePreviewClip.displayTime}</time>
                   <strong>{activePreviewClip.activity || '이 장면의 문구를 입력해 주세요'}</strong>
-                  <small>{previewPresentation.english}</small>
+                  {previewPresentation.english && <div className="xp-english-caption"><i>EN</i><span>{previewPresentation.english}</span></div>}
                 </div>
               </div>
             )}
             {activePreviewClip.caption && tab !== 'COVER' && <p className="manual-video-caption">{activePreviewClip.caption}</p>}
-            {showActivePopup && tab !== 'COVER' && <XpVlogWidget clip={activePreviewClip} progress={activePopupProgress} />}
+            {previewShowsXpCut && <div className="xp-intermission-dim" />}
+            {showActivePopup && tab !== 'COVER' && widgetClip && <XpVlogWidget clip={widgetClip} progress={activePopupProgress} previousEnergy={widgetPreviousEnergy} />}
           </div>
           <div className="preview-meta"><span>미리보기 화질 · 가볍게</span><span>저장 화질 · 1080 × 1920</span></div>
         </section>
@@ -312,15 +339,15 @@ export const EditorScreen = ({
 
           {tab === 'POPUP' && (
             <div className="inspector-panel popup-panel">
-              <label className="toggle-field"><span>SHOW XP WIDGET<small>선택한 시간에만 레트로 효과 표시</small></span><input type="checkbox" checked={selected.popup.enabled} onChange={(event) => updatePopup({ enabled: event.target.checked })} /></label>
+              <label className="toggle-field"><span>SHOW XP CUT<small>현재 컷 앞의 전환 구간에만 표시</small></span><input type="checkbox" checked={selected.popup.enabled} onChange={(event) => updatePopup({ enabled: event.target.checked })} /></label>
               <p className="suggestion-label">XP EFFECT</p>
               <div className="popup-effect-grid">
                 {(['MESSAGE', 'ENERGY BAR', 'XP CLOCK'] as const).map((effect) => <button key={effect} className={selected.popup.effect === effect ? 'active' : ''} onClick={() => updatePopup({ enabled: true, effect })}>{effect === 'MESSAGE' ? '메시지' : effect === 'ENERGY BAR' ? '충전 바' : 'XP 시계'}</button>)}
               </div>
-              <div className="field-row popup-timing-fields"><label>시작 <span>초</span><input aria-label="말풍선 시작 시간" type="number" min="0" max={Math.max((selected.trimEnd - selected.trimStart) / selected.speed - 0.3, 0)} step="0.1" value={selected.popup.startAt} onChange={(event) => updatePopup({ startAt: Math.max(Number(event.target.value), 0) })} /></label><label>유지 <span>초</span><input aria-label="말풍선 유지 시간" type="number" min="0.3" max={Math.max((selected.trimEnd - selected.trimStart) / selected.speed, 0.3)} step="0.1" value={selected.popup.duration} onChange={(event) => updatePopup({ duration: Math.max(Number(event.target.value), 0.3) })} /></label></div>
+              <label className="popup-duration-field">컷 전환 길이 <span>{selected.popup.duration.toFixed(1)}초</span><input aria-label="말풍선 유지 시간" type="range" min="0.4" max="2" step="0.1" value={selected.popup.duration} onChange={(event) => updatePopup({ duration: Number(event.target.value) })} /></label>
+              {selected.popup.effect === 'ENERGY BAR' && <label>다음 컷 체력 <span>{selected.energy}%</span><input aria-label="다음 컷 체력" type="range" min="0" max="100" value={selected.energy} onChange={(event) => onUpdateClip(selected.id, { energy: Number(event.target.value) })} /></label>}
               <label>TITLE<select value={selected.popup.kind} onChange={(event) => updatePopup({ kind: event.target.value as DailoClip['popup']['kind'], title: event.target.value })}><option>SYSTEM MESSAGE</option><option>WARNING</option><option>ACHIEVEMENT</option></select></label>
               <label>MESSAGE<textarea rows={2} value={selected.popup.message} onChange={(event) => updatePopup({ message: event.target.value.toUpperCase() })} /></label>
-              <label>BUTTON<input value={selected.popup.button} onChange={(event) => updatePopup({ button: event.target.value.toUpperCase() })} /></label>
               <p className="suggestion-label">QUICK MESSAGE</p><div className="suggestions">{popupSuggestions.map((message) => <button key={message} onClick={() => updatePopup({ enabled: true, message })}>{message}</button>)}</div>
             </div>
           )}

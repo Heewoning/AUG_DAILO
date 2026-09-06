@@ -20,10 +20,10 @@ const download = (blob: Blob, fileName: string) => {
   anchor.download = fileName
   anchor.style.display = 'none'
   document.body.append(anchor)
-  window.requestAnimationFrame(() => {
-    anchor.click()
-    anchor.remove()
-  })
+  // Keep the click inside the original user gesture. Kakao/Samsung WebViews
+  // commonly block downloads deferred to requestAnimationFrame.
+  anchor.click()
+  anchor.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
@@ -39,6 +39,10 @@ interface WritableFileHandle {
 interface WritableDirectoryHandle {
   getDirectoryHandle(name: string, options: { create: boolean }): Promise<WritableDirectoryHandle>
   getFileHandle(name: string, options: { create: boolean }): Promise<WritableFileHandle>
+}
+
+interface SaveFileHandle {
+  createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>
 }
 
 function App() {
@@ -333,15 +337,28 @@ function App() {
   const saveExportedVideo = useCallback(async () => {
     if (!exportedVideo) return
     try {
-      const picker = (window as Window & { showDirectoryPicker?: (options?: { id?: string; mode?: 'readwrite'; startIn?: 'videos' }) => Promise<WritableDirectoryHandle> }).showDirectoryPicker
-      if (picker) {
-        const root = await picker({ id: 'dailo-videos', mode: 'readwrite', startIn: 'videos' })
+      const pickerWindow = window as Window & {
+        showDirectoryPicker?: (options?: { id?: string; mode?: 'readwrite'; startIn?: 'videos' }) => Promise<WritableDirectoryHandle>
+        showSaveFilePicker?: (options?: { suggestedName?: string; types?: Array<{ description: string; accept: Record<string, string[]> }> }) => Promise<SaveFileHandle>
+      }
+      if (pickerWindow.showDirectoryPicker) {
+        const root = await pickerWindow.showDirectoryPicker({ id: 'dailo-videos', mode: 'readwrite', startIn: 'videos' })
         const folder = await root.getDirectoryHandle('DAILO', { create: true })
         const handle = await folder.getFileHandle(exportedVideo.fileName, { create: true })
         const writer = await handle.createWritable()
         await writer.write(exportedVideo.blob)
         await writer.close()
         setToast('선택한 위치의 DAILO 폴더에 저장했어요.')
+      } else if (pickerWindow.showSaveFilePicker) {
+        const extension = exportedVideo.fileName.endsWith('.mp4') ? '.mp4' : '.webm'
+        const handle = await pickerWindow.showSaveFilePicker({
+          suggestedName: exportedVideo.fileName,
+          types: [{ description: 'DAILO video', accept: { [exportedVideo.blob.type || 'video/webm']: [extension] } }],
+        })
+        const writer = await handle.createWritable()
+        await writer.write(exportedVideo.blob)
+        await writer.close()
+        setToast('선택한 위치에 영상을 저장했어요.')
       } else {
         download(exportedVideo.blob, exportedVideo.fileName)
         setToast('이 브라우저에서는 폴더를 만들 수 없어 다운로드에 저장했어요.')

@@ -1,7 +1,7 @@
 import type { DailoClip, DailoProject } from '../types'
 import { activityTextProvider } from './activityText'
 import { resolveSessionMedia } from './mediaSession'
-import { popupPlaybackState, VLOG_OVERLAY } from './vlogOverlay'
+import { popupDuration, VLOG_OVERLAY } from './vlogOverlay'
 
 export interface ExportProgress {
   percent: number
@@ -44,6 +44,20 @@ const drawCoveredVideo = (context: CanvasRenderingContext2D, video: HTMLVideoEle
   const drawWidth = video.videoWidth * scale
   const drawHeight = video.videoHeight * scale
   context.drawImage(video, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight)
+}
+
+const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image()
+  image.onload = () => resolve(image)
+  image.onerror = () => reject(new Error('썸네일을 불러오지 못했어요.'))
+  image.src = source
+})
+
+const drawCoveredImage = (context: CanvasRenderingContext2D, image: HTMLImageElement, width: number, height: number) => {
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight)
+  const drawWidth = image.naturalWidth * scale
+  const drawHeight = image.naturalHeight * scale
+  context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight)
 }
 
 const drawTransitionOverlay = (context: CanvasRenderingContext2D, clip: DailoClip, elapsed: number, width: number, height: number) => {
@@ -104,16 +118,24 @@ const wrapText = (context: CanvasRenderingContext2D, text: string, maxWidth: num
   return visible
 }
 
-const drawXpWidget = (context: CanvasRenderingContext2D, clip: DailoClip, elapsed: number, width: number, height: number) => {
-  const state = popupPlaybackState(clip, elapsed)
-  if (!state.visible) return
+const drawXpWidget = (
+  context: CanvasRenderingContext2D,
+  clip: DailoClip,
+  progress: number,
+  previousEnergy: number,
+  width: number,
+  height: number,
+) => {
   const style = VLOG_OVERLAY.popup
   const popupX = width * style.left
   const popupWidth = width * (1 - style.left - style.right)
-  const popupY = height * style.top
   const titleHeight = width * style.titleBarHeight
-  const bodyHeight = width * (clip.popup.effect === 'XP CLOCK' ? 0.3 : 0.24)
+  const bodyHeight = width * (clip.popup.effect === 'XP CLOCK' ? .31 : .28)
   const popupHeight = titleHeight + bodyHeight
+  const popupY = (height - popupHeight) / 2
+  const normalizedProgress = Math.min(Math.max(progress, 0), 1)
+  const energy = previousEnergy + (clip.energy - previousEnergy) * normalizedProgress
+  const energyDirection = clip.energy >= previousEnergy ? 'CHARGING' : 'DRAINING'
 
   context.save()
   context.fillStyle = '#f4edda'
@@ -167,15 +189,15 @@ const drawXpWidget = (context: CanvasRenderingContext2D, clip: DailoClip, elapse
     context.strokeRect(trackX, trackY, trackWidth, trackHeight)
     const segments = 12
     for (let index = 0; index < segments; index += 1) {
-      if ((index + 1) / segments > state.progress) break
+      if ((index + 1) / segments > energy / 100) break
       const gap = width * .006
       const segmentWidth = (trackWidth - gap * (segments + 1)) / segments
-      context.fillStyle = index > 8 ? '#42a84d' : '#1d5db5'
+      context.fillStyle = energy < 30 ? '#d84b34' : energy > 75 ? '#42a84d' : '#1d5db5'
       context.fillRect(trackX + gap + index * (segmentWidth + gap), trackY + gap, segmentWidth, trackHeight - gap * 2)
     }
     context.fillStyle = '#41362e'
     context.font = `700 ${Math.round(width * .03)}px Tahoma, sans-serif`
-    context.fillText(`${Math.round(state.progress * 100)}% · CHARGING`, bodyCenter, bodyTop + bodyHeight * .84)
+    context.fillText(`${Math.round(energy)}% · ${energyDirection}`, bodyCenter, bodyTop + bodyHeight * .84)
   } else {
     const warningSize = width * .1
     context.fillStyle = '#f3c84e'
@@ -190,15 +212,17 @@ const drawXpWidget = (context: CanvasRenderingContext2D, clip: DailoClip, elapse
     context.fillText('!', popupX + popupWidth * .09 + warningSize / 2, bodyTop + bodyHeight * .58)
     context.textAlign = 'left'
     context.font = `800 ${Math.round(width * style.messageFont)}px Arial, sans-serif`
-    const messageLines = wrapText(context, clip.popup.message, popupWidth * .64, 2)
-    messageLines.forEach((line, index) => context.fillText(line, popupX + popupWidth * .28, bodyTop + bodyHeight * (.4 + index * .25)))
+    const messageLines = wrapText(context, clip.popup.message, popupWidth * .62, 2)
+    messageLines.forEach((line, index) => context.fillText(line, popupX + popupWidth * .28, bodyTop + bodyHeight * (.35 + index * .28)))
   }
   context.restore()
 }
 
-const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number, showXpTag: boolean, elapsed: number) => {
+const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, width: number, height: number, showXpTag: boolean) => {
   const presentation = activityTextProvider.present(clip.activity)
   const centerY = height * VLOG_OVERLAY.scene.centerY
+  context.textAlign = 'center'
+  context.textBaseline = 'alphabetic'
   if (showXpTag) {
     const tagWidth = width * (1 - VLOG_OVERLAY.scene.left - VLOG_OVERLAY.scene.right)
     const tagHeight = width * 0.09
@@ -230,15 +254,35 @@ const drawClipBubble = (context: CanvasRenderingContext2D, clip: DailoClip, widt
     context.strokeText(line, width / 2, lineY)
     context.fillText(line, width / 2, lineY)
   })
-  const englishSize = Math.round(width * VLOG_OVERLAY.scene.englishFont)
-  context.font = `500 ${englishSize}px Tahoma, Arial, sans-serif`
-  const english = fitText(context, clip.activityEnglishEdited ? clip.activityEnglish ?? '' : presentation.english, width * .78)
-  const englishY = koreanStartY + koreanLines.length * koreanSize * .96 + englishSize * .45
-  context.strokeText(english, width / 2, englishY)
-  context.fillText(english, width / 2, englishY)
+  const english = clip.activityEnglishEdited ? clip.activityEnglish ?? '' : presentation.english
+  if (english) {
+    const englishSize = Math.round(width * VLOG_OVERLAY.scene.englishFont)
+    context.font = `700 ${englishSize}px Tahoma, Arial, sans-serif`
+    const englishLines = wrapText(context, english, width * .57, 2)
+    const englishBoxWidth = width * .7
+    const englishLineHeight = englishSize * 1.15
+    const englishBoxHeight = Math.max(width * .09, englishLineHeight * englishLines.length + width * .035)
+    const englishX = (width - englishBoxWidth) / 2
+    const englishY = koreanStartY + koreanLines.length * koreanSize * .96 + width * .018
+    context.fillStyle = 'rgba(7,80,181,.92)'
+    context.fillRect(englishX, englishY, englishBoxWidth, englishBoxHeight)
+    context.strokeStyle = '#fff'
+    context.lineWidth = Math.max(2, width * .003)
+    context.strokeRect(englishX, englishY, englishBoxWidth, englishBoxHeight)
+    const badgeSize = englishBoxHeight - width * .025
+    context.fillStyle = '#f4cf63'
+    context.fillRect(englishX + width * .014, englishY + width * .0125, badgeSize, badgeSize)
+    context.fillStyle = '#143b78'
+    context.textAlign = 'center'
+    context.font = `900 ${Math.round(width * .027)}px Tahoma, sans-serif`
+    context.fillText('EN', englishX + width * .014 + badgeSize / 2, englishY + englishBoxHeight * .57)
+    context.fillStyle = '#fff'
+    context.textAlign = 'left'
+    context.font = `700 ${englishSize}px Tahoma, Arial, sans-serif`
+    const textX = englishX + width * .035 + badgeSize
+    englishLines.forEach((line, index) => context.fillText(line, textX, englishY + width * .025 + englishSize + index * englishLineHeight))
+  }
   context.textAlign = 'start'
-
-  drawXpWidget(context, clip, elapsed, width, height)
 
   if (clip.caption) {
     const captionWidth = width * (1 - VLOG_OVERLAY.caption.left - VLOG_OVERLAY.caption.right)
@@ -440,10 +484,22 @@ export const renderProject = async (
     for (const [index, clip] of clips.entries()) {
       try {
         await loadClip(clip)
-        await seekVideo(video, clip.analysis?.bestMoment ?? Math.min(clip.duration * .32, Math.max(clip.duration - .1, 0)))
         context.fillStyle = '#111'
         context.fillRect(0, 0, canvas.width, canvas.height)
-        drawCoveredVideo(context, video, canvas.width, canvas.height)
+        let usedEditorThumbnail = false
+        if (clip.thumbnail) {
+          try {
+            const thumbnail = await loadImage(clip.thumbnail)
+            drawCoveredImage(context, thumbnail, canvas.width, canvas.height)
+            usedEditorThumbnail = true
+          } catch {
+            // Fall back to the source frame when an old thumbnail can no longer be decoded.
+          }
+        }
+        if (!usedEditorThumbnail) {
+          await seekVideo(video, clip.analysis?.bestMoment ?? Math.min(clip.duration * .32, Math.max(clip.duration - .1, 0)))
+          drawCoveredVideo(context, video, canvas.width, canvas.height)
+        }
         drawCoverOverlay(context, project, canvas.width, canvas.height)
         forceFrame()
         renderableClips.push(clip)
@@ -457,7 +513,7 @@ export const renderProject = async (
 
     let renderedSeconds = 0
     for (const [index, clip] of renderableClips.entries()) {
-      const remainingSeconds = project.outputLength - renderedSeconds
+      let remainingSeconds = project.outputLength - renderedSeconds
       if (remainingSeconds <= 0) break
       try {
         await loadClip(clip)
@@ -466,6 +522,35 @@ export const renderProject = async (
       }
       const startAt = Math.min(Math.max(clip.trimStart, 0), Math.max(video.duration - 0.05, 0))
       await seekVideo(video, startAt)
+
+      if (clip.popup.enabled) {
+        const intermissionDuration = Math.min(popupDuration(clip), remainingSeconds)
+        const previousEnergy = index > 0 ? renderableClips[index - 1]?.energy ?? 100 : 100
+        const intermissionStartedAt = performance.now()
+        await new Promise<void>((resolve) => {
+          const frame = () => {
+            const progress = Math.min((performance.now() - intermissionStartedAt) / (intermissionDuration * 1000), 1)
+            context.fillStyle = '#111'
+            context.fillRect(0, 0, canvas.width, canvas.height)
+            drawCoveredVideo(context, video, canvas.width, canvas.height)
+            context.fillStyle = 'rgba(20,14,10,.64)'
+            context.fillRect(0, 0, canvas.width, canvas.height)
+            drawXpWidget(context, clip, progress, previousEnergy, canvas.width, canvas.height)
+            forceFrame()
+            onProgress({
+              percent: Math.round(5 + ((index - .15 + progress * .15) / renderableClips.length) * 92),
+              task: `${index + 1}번째 컷 전환을 만들고 있어요`,
+            })
+            if (progress >= 1) resolve()
+            else requestAnimationFrame(frame)
+          }
+          requestAnimationFrame(frame)
+        })
+        renderedSeconds += intermissionDuration
+        remainingSeconds = project.outputLength - renderedSeconds
+        if (remainingSeconds <= 0) break
+      }
+
       video.playbackRate = clip.speed
       videoGain.gain.value = clip.volume / 100
       const requestedEnd = Math.min(clip.trimEnd || video.duration, video.duration)
@@ -495,7 +580,7 @@ export const renderProject = async (
           drawCoveredVideo(context, video, canvas.width, canvas.height)
           const elapsedOutputSeconds = Math.max(video.currentTime - startAt, 0) / clip.speed
           drawTransitionOverlay(context, clip, elapsedOutputSeconds, canvas.width, canvas.height)
-          drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS, elapsedOutputSeconds)
+          drawClipBubble(context, clip, canvas.width, canvas.height, elapsedOutputSeconds <= SCENE_OVERLAY_SECONDS)
           forceFrame()
           const clipProgress = Math.min((video.currentTime - startAt) / Math.max(endAt - startAt, 0.1), 1)
           onProgress({

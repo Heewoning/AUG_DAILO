@@ -37,7 +37,7 @@ export const VLOG_OVERLAY = {
 } as const
 
 export const popupStartAt = (clip: DailoClip) => Math.max(clip.popup.startAt ?? 0.35, 0)
-export const popupDuration = (clip: DailoClip) => Math.max(clip.popup.duration ?? 1.6, 0.3)
+export const popupDuration = (clip: DailoClip) => Math.min(Math.max(clip.popup.duration ?? 1.2, 0.4), 2)
 
 export const popupPlaybackState = (clip: DailoClip, elapsedSeconds: number) => {
   const start = popupStartAt(clip)
